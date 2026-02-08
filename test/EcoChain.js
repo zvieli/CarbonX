@@ -18,7 +18,7 @@ describe("EcoNFT", function () {
     
     await ecoNFT.setMarketplace(marketplace.address);
 
-    const tx = await ecoNFT.mintProject(recipient.address, 500, 120);
+    const tx = await ecoNFT.mintProject(recipient.address, 500, 120, "ipfs://test");
     const receipt = await tx.wait();
     const tokenId = 1n; // Assuming first token token is 1
 

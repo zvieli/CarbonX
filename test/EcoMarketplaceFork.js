@@ -85,7 +85,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
 });
 
   it("Full Flow: Mint, List, Buy with ETH", async function () {
-    await ecoNFT.mintProject(seller.address, 100, 1);
+    await ecoNFT.mintProject(seller.address, 100, 1, "ipfs://test");
     const tokenId = 1n; // 1 since it's the first
 
     const priceUSDC = 100n * 10n**6n; // 100 USDC (6 decimals)
@@ -112,7 +112,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
   it("Reverts if expired", async function () {
     const provider = ethers.provider;
     
-    await ecoNFT.mintProject(seller.address, 100, 1);
+    await ecoNFT.mintProject(seller.address, 100, 1, "ipfs://test");
     const tokenId = 1n;
 
     await ecoNFT.connect(seller).approve(await marketplace.getAddress(), tokenId);
@@ -131,7 +131,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
 
   it("Royalty Split: Creator (10%) vs Seller (90%)", async function () {
     const creator = owner;
-    await ecoNFT.connect(creator).mintProject(creator.address, 100, 365);
+    await ecoNFT.connect(creator).mintProject(creator.address, 100, 365, "ipfs://test");
     const tokenId = await ecoNFT.totalSupply();
 
     await ecoNFT.connect(creator).transferFrom(creator.address, seller.address, tokenId);
@@ -154,7 +154,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
   });
 
   it("Refund Logic: Returns exact excess ETH", async function () {
-    await ecoNFT.mintProject(seller.address, 100, 365);
+    await ecoNFT.mintProject(seller.address, 100, 365, "ipfs://test");
     const tokenId = await ecoNFT.totalSupply();
     const priceUSDC = 100n * 10n**6n;
     await ecoNFT.connect(seller).approve(await marketplace.getAddress(), tokenId);
@@ -177,7 +177,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
   });
 
   it("Cancel Listing: Prevents purchase", async function () {
-    await ecoNFT.mintProject(seller.address, 100, 365);
+    await ecoNFT.mintProject(seller.address, 100, 365, "ipfs://test");
     const tokenId = await ecoNFT.totalSupply();
     await ecoNFT.connect(seller).approve(await marketplace.getAddress(), tokenId);
     await marketplace.connect(seller).listNFT(tokenId, 100n * 10n**6n);
@@ -190,7 +190,7 @@ describe("EcoMarketplace (Mainnet Fork)", function () {
   });
 
   it("Retired NFT: Cannot be bought", async function () {
-    await ecoNFT.mintProject(seller.address, 100, 365);
+    await ecoNFT.mintProject(seller.address, 100, 365, "ipfs://test");
     const tokenId = await ecoNFT.totalSupply();
     await ecoNFT.connect(seller).approve(await marketplace.getAddress(), tokenId);
     await marketplace.connect(seller).listNFT(tokenId, 100n * 10n**6n);

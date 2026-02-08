@@ -1,8 +1,16 @@
 import hre from "hardhat";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const { ethers } = hre;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function main() {
+    const network = await ethers.provider.getNetwork();
+    console.log(`Deploying to network: ${network.name} (Chain ID: ${network.chainId})`);
+
     const [deployer] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
 
@@ -49,6 +57,33 @@ async function main() {
     const roleTx = await ecoToken.grantRole(MINTER_ROLE, await ecoMarketplace.getAddress());
     await roleTx.wait();
     console.log("EcoToken grantRole executed");
+
+    // 5. Save Frontend Files
+    const contractsDir = path.join(__dirname, "..", "frontend", "contracts");
+    if (!fs.existsSync(contractsDir)) {
+        fs.mkdirSync(contractsDir, { recursive: true });
+    }
+
+    fs.writeFileSync(
+        path.join(contractsDir, "contract-addresses.json"),
+        JSON.stringify({
+            EcoNFT: await ecoNFT.getAddress(),
+            EcoToken: await ecoToken.getAddress(),
+            EcoMarketplace: await ecoMarketplace.getAddress()
+        }, null, 2)
+    );
+
+    // Save ABIs
+    const contractNames = ["EcoNFT", "EcoToken", "EcoMarketplace"];
+    for (const name of contractNames) {
+        const artifact = await hre.artifacts.readArtifact(name);
+        fs.writeFileSync(
+            path.join(contractsDir, `${name}.json`),
+            JSON.stringify(artifact, null, 2)
+        );
+    }
+    
+    console.log("Contracts saved to frontend/contracts");
 }
 
 main().catch((error) => {

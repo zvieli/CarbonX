@@ -1,0 +1,32 @@
+.status-box {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--bg-secondary);
+    border-radius: 0.5rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.status-box p {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.progress-indicators {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.progress-indicators span.active {
+    color: var(--accent-primary);
+    font-weight: 700;
+}
+
+.progress-indicators span.arrow {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}

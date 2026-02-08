@@ -4,9 +4,10 @@ pragma solidity ^0.8.28;
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { ERC721Enumerable } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import { ERC721URIStorage } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract EcoNFT is ERC721Enumerable, Ownable {
+contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
     struct ProjectData {
         uint128 carbonTons;
         uint64 creationDate;
@@ -14,6 +15,8 @@ contract EcoNFT is ERC721Enumerable, Ownable {
         bool isRetired;
         address originalCreator;
     }
+
+    event ProjectRetired(uint256 indexed tokenId);
 
     error NotMarketplace();
     error NotTokenOwner();
@@ -36,10 +39,11 @@ contract EcoNFT is ERC721Enumerable, Ownable {
         marketplace = newMarketplace;
     }
 
-    function mintProject(address to, uint256 tons, uint256 expiryDays) external onlyOwner returns (uint256) {
+    function mintProject(address to, uint256 tons, uint256 expiryDays, string memory uri) external onlyOwner returns (uint256) {
         if (expiryDays == 0) revert InvalidExpiry();
         uint256 tokenId = ++_nextTokenId;
         _safeMint(to, tokenId);
+        _setTokenURI(tokenId, uri);
 
         projects[tokenId] = ProjectData({
             carbonTons: uint128(tons),
@@ -59,6 +63,7 @@ contract EcoNFT is ERC721Enumerable, Ownable {
     function retire(uint256 tokenId) external {
         if (ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
         projects[tokenId].isRetired = true;
+        emit ProjectRetired(tokenId);
     }
 
     function priceHistoryLength(uint256 tokenId) external view returns (uint256) {
@@ -72,15 +77,19 @@ contract EcoNFT is ERC721Enumerable, Ownable {
         return super.isApprovedForAll(owner, operator);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721Enumerable) returns (bool) {
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721Enumerable, ERC721URIStorage) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
-    function _update(address to, uint256 tokenId, address auth) internal override(ERC721Enumerable) returns (address) {
+    function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
         return super._update(to, tokenId, auth);
     }
 
-    function _increaseBalance(address account, uint128 value) internal override(ERC721Enumerable) {
+    function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
         super._increaseBalance(account, value);
     }
 }

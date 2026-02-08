@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <g transform="translate(75, 75)">
+      <path d="M125,20 A105,105 0 1,1 125,230" stroke="#388e3c" stroke-width="12" fill="none" stroke-linecap="round"/>
+      <polygon points="125,20 145,0 145,40" fill="#388e3c" transform="rotate(5 125 20)"/>
+      
+      <circle cx="125" cy="125" r="90" fill="#e8f5e9"/>
+
+      <g transform="translate(65, 60)" fill="#388e3c">
+        <path d="M50,100 L50,140 C50,140 30,140 30,120 C30,100 50,100 50,100 Z" /> <path d="M70,100 L70,130 C70,150 90,150 90,130 L90,120 L80,120" stroke="#388e3c" stroke-width="8" fill="none" stroke-linecap="round"/> <rect x="55" y="80" width="10" height="60" rx="2"/>
+
+        <circle cx="60" cy="50" r="40" />
+        <circle cx="40" cy="60" r="25" />
+        <circle cx="80" cy="60" r="25" />
+        
+        <path d="M45,50 L55,60 L75,35" stroke="#e8f5e9" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+  </g>
+</svg>

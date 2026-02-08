@@ -17,3 +17,4 @@ node_modules
 ignition/deployments/chain-31337
 awake.ps1
 ethers.docs.md
+pinata.docs.md

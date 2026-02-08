@@ -1,0 +1,81 @@
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.details-image {
+    padding: 0.5rem;
+}
+
+.details-image img {
+    width: 100%;
+    border-radius: 0.5rem;
+}
+
+.details-info h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--accent-primary);
+}
+
+.description {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+    background-color: var(--bg-primary);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.stat-box {
+    text-align: center;
+}
+
+.stat-box label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.stat-box .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.bg-danger {
+    background-color: var(--danger) !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.mono {
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+
+.owner-text {
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
+.status-message {
+    margin-top: 1rem;
+    font-weight: bold;
+    color: var(--warning);
+}
