@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.20;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract EcoToken is ERC20, AccessControl {
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-
-    constructor() ERC20("ProofOfGreen Token", "POG") {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
+contract EcoToken is ERC20, Ownable {
+    constructor() ERC20("EcoToken", "ECO") Ownable(msg.sender) {
+        // Mint initial supply to the deployer (Owner)
+        _mint(msg.sender, 100000000 * 10 ** decimals());
     }
 
-    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+    // Allow owner to mint more tokens (Liquidity management)
+    function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
+    }
+
+    // Faucet for testing: Anyone can get 1000 tokens
+    function faucet() external {
+        _mint(msg.sender, 1000 * 10 ** decimals());
     }
 }

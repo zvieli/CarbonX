@@ -1,160 +1,120 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.20;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import { ISwapRouter } from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
-interface IPeripheryPayments {
-    function refundETH() external payable;
+// Minimal WETH Interface
+interface IWETH is IERC20 {
+    function deposit() external payable;
+    function withdraw(uint256) external;
 }
 
-interface IEcoNFT is IERC721 {
-    function projects(uint256 tokenId)
-        external
-        view
-        returns (
-            uint128 carbonTons,
-            uint64 creationDate,
-            uint64 expiryDate,
-            bool isRetired,
-            address originalCreator
-        );
-
-    function recordSale(uint256 tokenId, uint256 price) external;
-}
-
-interface IEcoToken is IERC20 {
-    function mint(address to, uint256 amount) external;
-}
-
-contract EcoMarketplace {
+contract EcoMarketplace is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     struct Listing {
+        uint256 tokenId;
         address seller;
-        uint256 priceInUSDC;
+        uint256 price; // Price in EcoToken
+        bool sold;
     }
 
-    error NotTokenOwner();
-    error NotApproved();
-    error InvalidPrice();
-    error NotListed();
-    error ListingStale();
-    error ListingExpired();
-    error InsufficientETH();
-    error TokenRetired();
-    error InvalidOraclePrice();
-
-    event Listed(uint256 indexed tokenId, address indexed seller, uint256 priceInUSDC);
-    event Purchased(uint256 indexed tokenId, address indexed buyer, uint256 priceInUSDC);
-    event ListingCanceled(uint256 indexed tokenId, address indexed seller);
-
-    IEcoNFT public immutable ecoNFT;
-    IERC20 public immutable usdc;
-    IEcoToken public immutable ecoToken;
-    ISwapRouter public immutable swapRouter;
-    AggregatorV3Interface public immutable ethUsdFeed;
-    address public immutable weth;
+    IERC721 public nftContract;
+    IERC20 public ecoToken;
+    ISwapRouter public constant swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    address public constant WETH9 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     mapping(uint256 => Listing) public listings;
+    
+    event ProjectListed(uint256 indexed tokenId, address indexed seller, uint256 price);
+    event ProjectSold(uint256 indexed tokenId, address indexed buyer, uint256 price);
 
-    constructor(address nft, address usdcAddress, address wethAddress, address router, address ethUsdFeedAddress, address ecoTokenAddress) {
-        ecoNFT = IEcoNFT(nft);
-        usdc = IERC20(usdcAddress);
-        weth = wethAddress;
-        swapRouter = ISwapRouter(router);
-        ethUsdFeed = AggregatorV3Interface(ethUsdFeedAddress);
-        ecoToken = IEcoToken(ecoTokenAddress);
+    error NotListed();
+    error AlreadySold();
+    error IncorrectPrice();
+    error TokenTransferFailed();
+
+    constructor(address _nftContract, address _ecoToken) {
+        nftContract = IERC721(_nftContract);
+        ecoToken = IERC20(_ecoToken);
     }
 
-    function listNFT(uint256 tokenId, uint256 priceInUSDC) external {
-        if (priceInUSDC == 0) revert InvalidPrice();
-        if (ecoNFT.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
-        if (!ecoNFT.isApprovedForAll(msg.sender, address(this)) && ecoNFT.getApproved(tokenId) != address(this)) {
-            revert NotApproved();
-        }
-
-        listings[tokenId] = Listing({ seller: msg.sender, priceInUSDC: priceInUSDC });
-        emit Listed(tokenId, msg.sender, priceInUSDC);
-    }
-
-    function cancelListing(uint256 tokenId) external {
-        Listing memory listing = listings[tokenId];
-        if (listing.seller == address(0)) revert NotListed();
-        if (listing.seller != msg.sender) revert NotTokenOwner();
-
-        delete listings[tokenId];
-        emit ListingCanceled(tokenId, msg.sender);
-    }
-
-    function buyWithETH(uint256 tokenId) external payable {
-        Listing memory listing = listings[tokenId];
-        if (listing.seller == address(0)) revert NotListed();
-        if (ecoNFT.ownerOf(tokenId) != listing.seller) revert ListingStale();
-
-        address originalCreator;
-        {
-            (,, uint64 expiryDate, bool isRetired, address creator) = ecoNFT.projects(tokenId);
-            if (block.timestamp > expiryDate) revert ListingExpired();
-            if (isRetired) revert TokenRetired();
-            originalCreator = creator;
-        }
-
-        {
-            // Price from Chainlink
-            (, int256 ethUsdPrice,,,) = ethUsdFeed.latestRoundData();
-            if (ethUsdPrice <= 0) revert InvalidOraclePrice();
-
-            // Required Wei with 2% buffer
-            uint256 requiredWei = ((listing.priceInUSDC * 1e20) / uint256(ethUsdPrice)) * 102 / 100;
-            if (msg.value < requiredWei) revert InsufficientETH();
-        }
-
-        // Uniswap Swap
-        ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
-            tokenIn: weth,
-            tokenOut: address(usdc),
-            fee: 3000,
-            recipient: address(this),
-            deadline: block.timestamp,
-            amountOut: listing.priceInUSDC,
-            amountInMaximum: msg.value,
-            sqrtPriceLimitX96: 0
+    function listProject(uint256 tokenId, uint256 price) external {
+        listings[tokenId] = Listing({
+            tokenId: tokenId,
+            seller: msg.sender,
+            price: price,
+            sold: false
         });
 
-        // Execute Swap
-        // Router refunds unused ETH as WETH to this contract
-        swapRouter.exactOutputSingle{ value: msg.value }(params);
+        emit ProjectListed(tokenId, msg.sender, price);
+    }
 
-        // Unwrap WETH refund via Router
-        IPeripheryPayments(address(swapRouter)).refundETH();
+    // Standard Buy: User pays with EcoToken (Requires Approve)
+    function buyProject(uint256 tokenId) external nonReentrant {
+        Listing storage listing = listings[tokenId];
+        if (listing.price == 0) revert NotListed();
+        if (listing.sold) revert AlreadySold();
 
-        // Refund EXACT surplus only based on actual balance returned
-        uint256 balanceLeft = address(this).balance;
-        if (balanceLeft > 0) {
-            (bool success, ) = payable(msg.sender).call{value: balanceLeft}("");
-            require(success, "Refund failed");
+        ecoToken.safeTransferFrom(msg.sender, listing.seller, listing.price);
+
+        listing.sold = true;
+        nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
+
+        emit ProjectSold(tokenId, msg.sender, listing.price);
+    }
+
+    // Advanced Buy: User pays with ETH -> Auto-Swap to EcoToken -> Buy
+    function buyWithETH(uint256 tokenId) external payable nonReentrant {
+        Listing storage listing = listings[tokenId];
+        if (listing.price == 0) revert NotListed();
+        if (listing.sold) revert AlreadySold();
+
+        // 1. Wrap ETH
+        IWETH(WETH9).deposit{value: msg.value}();
+
+        // 2. Approve Router
+        IERC20(WETH9).approve(address(swapRouter), msg.value);
+
+        // 3. Swap WETH -> ECO
+        ISwapRouter.ExactOutputSingleParams memory params =
+            ISwapRouter.ExactOutputSingleParams({
+                tokenIn: WETH9,
+                tokenOut: address(ecoToken),
+                fee: 3000,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountOut: listing.price,
+                amountInMaximum: msg.value,
+                sqrtPriceLimitX96: 0
+            });
+
+        uint256 amountIn = swapRouter.exactOutputSingle(params);
+
+        // 4. Refund leftover ETH
+        if (amountIn < msg.value) {
+            uint256 refund = msg.value - amountIn;
+            IWETH(WETH9).withdraw(refund);
+            (bool success, ) = msg.sender.call{value: refund}("");
+            require(success, "ETH Refund failed");
         }
 
-        // Royalties
-        uint256 royalty = listing.priceInUSDC / 10;
-        uint256 sellerAmount = listing.priceInUSDC - royalty;
+        // 5. Reset Approval
+        IERC20(WETH9).approve(address(swapRouter), 0);
 
-        usdc.safeTransfer(listing.seller, sellerAmount);
-        usdc.safeTransfer(originalCreator, royalty);
+        // 6. Complete Purchase
+        ecoToken.safeTransfer(listing.seller, listing.price);
+        
+        listing.sold = true;
+        nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
 
-        // State Update
-        delete listings[tokenId];
-        ecoNFT.recordSale(tokenId, listing.priceInUSDC);
-        ecoNFT.safeTransferFrom(listing.seller, msg.sender, tokenId);
-
-        // Reward
-        ecoToken.mint(msg.sender, 10 * 10**18);
-
-        emit Purchased(tokenId, msg.sender, listing.priceInUSDC);
+        emit ProjectSold(tokenId, msg.sender, listing.price);
     }
+
+    // Allow receiving ETH (for WETH unwrapping)
     receive() external payable {}
 }

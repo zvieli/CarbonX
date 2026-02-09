@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { getGatewayUrl } from '../services/pinata';
 import './ProjectDetails.css';
@@ -8,11 +9,12 @@ const ProjectDetails = () => {
     const { id } = useParams();
     const { contracts, isOwner, account } = useWeb3();
     const [project, setProject] = useState(null);
+    const [listing, setListing] = useState(null); // Stores listing info
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState("");
 
     useEffect(() => {
-        if (contracts.ecoNFT) {
+        if (contracts.ecoNFT && contracts.ecoMarketplace) {
             loadProjectDetails();
         }
     }, [contracts, id]);
@@ -24,6 +26,18 @@ const ProjectDetails = () => {
             const tokenURI = await contracts.ecoNFT.tokenURI(id);
             const ownerOf = await contracts.ecoNFT.ownerOf(id);
             
+            // Check Marketplace Listing
+            // Listing struct: tokenId, seller, price, sold
+            const listingData = await contracts.ecoMarketplace.listings(id);
+            if (listingData && listingData.price > 0n && !listingData.sold) {
+                setListing({
+                    price: ethers.formatEther(listingData.price),
+                    seller: listingData.seller
+                });
+            } else {
+                setListing(null);
+            }
+
             // IPFS Fetch
             let metadata = { name: `Project #${id}`, image: '' };
             const gatewayUrl = getGatewayUrl(tokenURI);
@@ -62,6 +76,62 @@ const ProjectDetails = () => {
         }
     };
 
+    const buyWithEco = async () => {
+        if (!listing) return;
+        try {
+            setStatus("Approving EcoToken...");
+            const priceWei = ethers.parseEther(listing.price);
+            
+            // Check Allowance
+            const marketplaceAddr = await contracts.ecoMarketplace.getAddress();
+            const allowance = await contracts.ecoToken.allowance(account, marketplaceAddr);
+            
+            if (allowance < priceWei) {
+                const txApprove = await contracts.ecoToken.approve(marketplaceAddr, priceWei);
+                await txApprove.wait();
+            }
+
+            setStatus("Buying with EcoToken...");
+            const txBuy = await contracts.ecoMarketplace.buyProject(id);
+            await txBuy.wait();
+            
+            setStatus("Purchase Successful!");
+            loadProjectDetails();
+        } catch (error) {
+            console.error("Buy ECO failed:", error);
+            setStatus("Purchase failed: " + (error.reason || error.message));
+        }
+    };
+
+    const buyWithEth = async () => {
+        if (!listing) return;
+        try {
+            setStatus("Calculating Swap...");
+            // Estimate: 100 ECO ~ 0.04 ETH. We send safety margin.
+            // In production we would query Quoter, but for this demo we send generous amount.
+            // 2500 ECO = 1 ETH -> 1 ECO = 0.0004 ETH
+            // Listing Price (ECO) * 0.0004 = Clean Cost
+            // We multiply by 1.5 for safety (slippage + fees)
+            // Note: Contract refunds excess.
+            
+            const priceEco = parseFloat(listing.price);
+            const ethEstimate = (priceEco / 2500) * 1.5; 
+            const valueToSend = ethers.parseEther(ethEstimate.toFixed(18));
+
+            console.log("Sending ETH:", ethEstimate);
+
+            setStatus("Buying with ETH (DeFi Swap)...");
+            const txBuy = await contracts.ecoMarketplace.buyWithETH(id, { value: valueToSend });
+            await txBuy.wait();
+
+            setStatus("Purchase Successful! (Excess ETH Refunded)");
+            loadProjectDetails();
+        } catch (error) {
+            console.error("Buy ETH failed:", error);
+            setStatus("DeFi Purchase failed: " + (error.reason || error.message));
+        }
+    };
+
     if (loading) return <div className="container">Loading...</div>;
     if (!project) return <div className="container">not found</div>;
 
@@ -97,17 +167,45 @@ const ProjectDetails = () => {
 
                     <p className="owner-text">Owner: <span className="mono">{project.owner}</span></p>
 
+                    {listing && (
+                        <div className="listing-info">
+                            <h3>For Sale</h3>
+                            <p className="price-tag">{listing.price} ECO</p>
+                            <p>or pay with ETH (auto-swap)</p>
+                        </div>
+                    )}
+
                     <div className="actions">
+                        {isMyToken && !project.isRetired && !listing && (
+                            <button className="btn-secondary" onClick={() => alert("Listing feature in AdminMint for now")}>
+                                List for Sale
+                            </button>
+                        )}
+                        
                         {isMyToken && !project.isRetired && (
                             <button className="btn-primary bg-danger" onClick={retireToken}>
                                 Retire Credit (Consume)
                             </button>
                         )}
-                        {!isMyToken && !project.isRetired && (
-                            <button className="btn-primary" disabled>
-                                Buy on Marketplace (Checking Listings...)
+
+                        {!isMyToken && !project.isRetired && listing && (
+                            <div className="buy-buttons">
+                                <button className="btn-primary" onClick={buyWithEco}>
+                                    Buy with ECO (Standard)
+                                </button>
+                                <button className="btn-secondary" onClick={buyWithEth}>
+                                    Buy with ETH (DeFi)
+                                </button>
+                            </div>
+                        )}
+                        
+                        {!isMyToken && !project.isRetired && !listing && (
+                            <button className="btn-disabled" disabled>
+                                Not Listed
                             </button>
                         )}
+
+
                     </div>
                      {status && <p className="status-message">{status}</p>}
                 </div>

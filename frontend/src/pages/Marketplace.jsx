@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
@@ -10,7 +11,7 @@ const Marketplace = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (contracts.ecoNFT) {
+        if (contracts.ecoNFT && contracts.ecoMarketplace) {
             loadProjects();
         }
     }, [contracts]);
@@ -18,11 +19,10 @@ const Marketplace = () => {
     const loadProjects = async () => {
         try {
             setLoading(true);
-            const totalSupply = await contracts.ecoNFT.totalSupply(); // Number, but ethers returns BigInt
+            const totalSupply = await contracts.ecoNFT.totalSupply();
             const loadedProjects = [];
 
             // Loop backwards to show newest first, limit to 20 for now
-            // Note: totalSupply is BigInt in ethers v6
             const total = Number(totalSupply);
             for (let i = total; i > 0 && i > total - 20; i--) {
                 const tokenId = i;
@@ -31,6 +31,20 @@ const Marketplace = () => {
                 const projectData = await contracts.ecoNFT.projects(tokenId);
                 const tokenURI = await contracts.ecoNFT.tokenURI(tokenId);
                 
+                // Check Listing
+                let listingInfo = null;
+                try {
+                    const listing = await contracts.ecoMarketplace.listings(tokenId);
+                    if (listing && listing.price > 0n && !listing.sold) {
+                        listingInfo = {
+                            price: ethers.formatEther(listing.price),
+                            seller: listing.seller
+                        };
+                    }
+                } catch (err) {
+                    console.warn("Listing check failed", tokenId);
+                }
+
                 // Fetch IPFS Metadata
                 let metadata = { name: `Project #${tokenId}`, image: '' };
                 try {
@@ -50,7 +64,8 @@ const Marketplace = () => {
                     // Parse BigInts for display
                     carbonTons: projectData.carbonTons.toString(),
                     expiryDate: Number(projectData.expiryDate),
-                    isRetired: projectData.isRetired
+                    isRetired: projectData.isRetired,
+                    listing: listingInfo
                 });
             }
 
@@ -82,6 +97,9 @@ const Marketplace = () => {
                                         <div className="placeholder-image">🌿</div>
                                     )}
                                     {project.isRetired && <div className="badge retired-badge">RETIRED</div>}
+                                    {project.listing && !project.isRetired && (
+                                        <div className="badge price-badge">{project.listing.price} ECO</div>
+                                    )}
                                 </div>
                                 <div className="card-content">
                                     <h3>{project.name}</h3>

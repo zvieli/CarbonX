@@ -2,8 +2,8 @@ import { PinataSDK } from "pinata";
 
 // Initialize Pinata SDK with config from environment variables
 const pinata = new PinataSDK({
-  pinataJwt: import.meta.env.VITE_PINATA_JWT,
-  pinataGateway: import.meta.env.VITE_PINATA_GATEWAY,
+  pinataJwt: import.meta.env.PINATA_JWT,
+  pinataGateway: import.meta.env.PINATA_GATEWAY,
 });
 
 /**
@@ -48,5 +48,5 @@ export const uploadToIPFS = async (file, metadata) => {
 export const getGatewayUrl = (ipfsUri) => {
   if (!ipfsUri) return "";
   const cid = ipfsUri.replace("ipfs://", "");
-  return `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${cid}`;
+  return `https://${import.meta.env.PINATA_GATEWAY}/ipfs/${cid}`;
 };
