@@ -8,6 +8,7 @@ import './Marketplace.css';
 const Marketplace = () => {
     const { contracts } = useWeb3();
     const [projects, setProjects] = useState([]);
+    const [showListedOnly, setShowListedOnly] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -31,19 +32,19 @@ const Marketplace = () => {
                 const projectData = await contracts.ecoNFT.projects(tokenId);
                 const tokenURI = await contracts.ecoNFT.tokenURI(tokenId);
                 
-                // Check Listing
+                // Fetch Listing Info
                 let listingInfo = null;
                 try {
                     const listing = await contracts.ecoMarketplace.listings(tokenId);
-                    if (listing && listing.price > 0n && !listing.sold) {
+                    // Check if it's listed (price > 0 and not sold) or just sold for history
+                    if (listing.price > 0n) {
                         listingInfo = {
                             price: ethers.formatEther(listing.price),
-                            seller: listing.seller
+                            seller: listing.seller,
+                            sold: listing.sold
                         };
                     }
-                } catch (err) {
-                    console.warn("Listing check failed", tokenId);
-                }
+                } catch (err) { /* Not listed */ }
 
                 // Fetch IPFS Metadata
                 let metadata = { name: `Project #${tokenId}`, image: '' };
@@ -77,41 +78,96 @@ const Marketplace = () => {
         }
     };
 
-    if (!contracts.ecoNFT) return <div className="container text-center">Please connect wallet...</div>;
+    if (!contracts.ecoNFT) return <div className="container text-center text-accent" style={{marginTop:'5rem'}}>Waiting for connection...</div>;
+    
+    // Filter logic
+    const displayedProjects = showListedOnly 
+        ? projects.filter(p => p.listing && !p.listing.sold && !p.isRetired)
+        : projects;    
 
     return (
         <div className="container">
-            <h1 className="page-title">Reforesation Projects</h1>
+            <div className="marketplace-header glass-panel" style={{marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <div>
+                   <h1 className="text-gradient">Marketplace</h1>
+                   <p style={{color: 'var(--text-secondary)'}}>Discover verified carbon offsets.</p>
+                </div>
+                
+                <div className="filter-controls">
+                    <label className="checkbox-wrapper">
+                        <input 
+                            type="checkbox" 
+                            checked={showListedOnly} 
+                            onChange={(e) => setShowListedOnly(e.target.checked)} 
+                        />
+                        <span className="checkbox-custom"></span>
+                        <span className="label-text">For Sale Only</span>
+                    </label>
+                </div>
+            </div>
             
             {loading ? (
-                <div className="loading-spinner">Loading...</div>
+                <div className="loading-container">
+                    <i className="fas fa-circle-notch fa-spin fa-2x text-accent"></i>
+                    <p>Loading Assets...</p>
+                </div>
             ) : (
                 <div className="grid-cards">
-                    {projects.map((project) => (
+                    {displayedProjects.map((project) => (
                         <Link key={project.id} to={`/project/${project.id}`} className="project-card-link">
-                            <div className={`card project-card ${project.isRetired ? 'retired' : ''}`}>
+                            <div className={`card project-card ${project.isRetired ? 'retired-card' : ''}`}>
                                 <div className="card-image-wrapper">
                                     {project.image ? (
                                         <img src={getGatewayUrl(project.image)} alt={project.name} />
                                     ) : (
-                                        <div className="placeholder-image">🌿</div>
+                                        <div className="placeholder-image"><i className="fas fa-leaf"></i></div>
                                     )}
+                                    
+                                    {/* Status Badges */}
                                     {project.isRetired && <div className="badge retired-badge">RETIRED</div>}
-                                    {project.listing && !project.isRetired && (
-                                        <div className="badge price-badge">{project.listing.price} ECO</div>
-                                    )}
+                                    {project.listing?.sold && !project.isRetired && <div className="badge sold-badge">SOLD</div>}
                                 </div>
+
                                 <div className="card-content">
-                                    <h3>{project.name}</h3>
-                                    <div className="stat-row">
-                                        <span><i className="fas fa-leaf"></i> {project.carbonTons} Tons</span>
-                                        <span><i className="fas fa-clock"></i> {new Date(project.expiryDate * 1000).toLocaleDateString()}</span>
+                                    <div className="card-title-row">
+                                        <h3>{project.name}</h3>
+                                        <div className="token-id">#{project.id}</div>
+                                    </div>
+                                    
+                                    <div className="stats-grid">
+                                        <div className="stat">
+                                            <span className="label">Carbon</span>
+                                            <span className="value text-accent">{project.carbonTons} t</span>
+                                        </div>
+                                        <div className="stat">
+                                            <span className="label">Expiry</span>
+                                            <span className="value">
+                                                {new Date(project.expiryDate * 1000).toLocaleDateString(undefined, {year: '2-digit', month:'short'})}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="card-footer">
+                                        {project.listing && !project.listing.sold && !project.isRetired ? (
+                                            <div className="price-display">
+                                                <span className="price-label">Price</span>
+                                                <span className="price-amount text-gradient">{project.listing.price} ECO</span>
+                                            </div>
+                                        ) : (
+                                            <div className="status-text">
+                                                {project.isRetired ? "Retired Asset" : (project.listing?.sold ? "Recently Sold" : "Not Listed")}
+                                            </div>
+                                        )}
+                                        
+                                        <div className="action-arrow">
+                                            <i className="fas fa-arrow-right"></i>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </Link>
                     ))}
-                    {projects.length === 0 && <p>No projects found.</p>}
+                    {projects.length === 0 && <div className="empty-state">No projects found.</div>}
                 </div>
             )}
         </div>

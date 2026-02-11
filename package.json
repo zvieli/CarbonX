@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "node": "npx hardhat node --fork https://eth-mainnet.g.alchemy.com/v2/C71xjjRnVc5bmInmm-AQ3",
+    "test": "npx hardhat test --network localhost",
+    "deploy": "npx hardhat run scripts/deploy.js --network localhost",
+    "front": "cd frontend && npm run dev"
   },
   "author": "",
   "license": "ISC",

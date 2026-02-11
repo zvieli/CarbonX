@@ -67,6 +67,12 @@ describe("Proof of Green - DeFi & Marketplace Tests", function () {
         recipient: owner.address,
         deadline: Math.floor(Date.now() / 1000) + 60
     };
+    
+    // Ensure sufficient balance for STF
+    if (token0 === WETH_ADDRESS) {
+       await weth.deposit({ value: amountEth * 2n }); 
+    }
+    
     await nftPositionManager.mint(params);
 
     // 3. Deploy Marketplace

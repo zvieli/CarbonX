@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { uploadToIPFS } from '../services/pinata';
+import { ethers } from 'ethers';
 import './AdminMint.css';
 import './AdminMintStatus.css';
 
@@ -11,10 +12,12 @@ const AdminMint = () => {
         description: '',
         tons: '',
         expiryDays: '365', // Default 1 year
+        price: '' // New Price Field
     });
     const [file, setFile] = useState(null);
+    const [preview, setPreview] = useState(null); // Image Preview
     const [status, setStatus] = useState('');
-    const [progressStep, setProgressStep] = useState(0); // 0: Idle, 1: IPFS, 2: Wallet Sign, 3: Confirmation
+    const [progressStep, setProgressStep] = useState(0); // 0: Idle, 1: IPFS, 2: Mint, 3: Approve, 4: List
     const [isMinting, setIsMinting] = useState(false);
 
     if (loading) return <div className="container">Loading...</div>;
@@ -22,7 +25,12 @@ const AdminMint = () => {
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
+            const selectedFile = e.target.files[0];
+            setFile(selectedFile);
+            
+            // Create Preview URL
+            const objectUrl = URL.createObjectURL(selectedFile);
+            setPreview(objectUrl);
         }
     };
 
@@ -32,17 +40,18 @@ const AdminMint = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!file || !formData.name || !formData.tons) {
-            setStatus("Please fill in all fields.");
+        if (!file || !formData.name || !formData.tons || !formData.price) {
+            setStatus("Please fill in all fields (including Price).");
             return;
         }
 
         try {
             setIsMinting(true);
+            
+            // --- Step 1: IPFS Upload ---
             setProgressStep(1);
-            setStatus("Uploading image and metadata to IPFS...");
+            setStatus("Uploading Metadata to IPFS...");
 
-            // 1. Upload Metadata to Pinata
             const metadata = {
                 name: formData.name,
                 description: formData.description,
@@ -55,28 +64,57 @@ const AdminMint = () => {
             const tokenURI = await uploadToIPFS(file, metadata);
             console.log("Uploaded URI:", tokenURI);
 
-            // 2. Mint on Blockchain
+            // --- Step 2: Minting ---
             setProgressStep(2);
-            setStatus("Please confirm transaction in your wallet...");
+            setStatus("Minting NFT on Blockchain...");
             
-            const tx = await contracts.ecoNFT.mintProject(
-                await contracts.ecoNFT.runner.getAddress(), // Mint to self (admin) first
+            const adminAddress = await contracts.ecoNFT.runner.getAddress();
+            const txMint = await contracts.ecoNFT.mintProject(
+                adminAddress, 
                 formData.tons,
                 formData.expiryDays,
                 tokenURI
             );
             
-            setProgressStep(3);
-            setStatus("Waiting for block confirmation...");
-            await tx.wait();
+            setStatus("Waiting for Block Confirmation...");
+            const receipt = await txMint.wait();
+            
+            // Parse Token ID from logs
+            let tokenId = null;
+            for (const log of receipt.logs) {
+                try {
+                    const parsed = contracts.ecoNFT.interface.parseLog(log);
+                    if (parsed.name === 'Transfer') {
+                        tokenId = parsed.args[2]; // tokenId is the 3rd argument in Transfer(from, to, tokenId)
+                        break;
+                    }
+                } catch (e) { /* ignore other logs */ }
+            }
 
-            setStatus("Successfully Minted!");
-            setFormData({ name: '', description: '', tons: '', expiryDays: '365' });
-            setFile(null);
-            setProgressStep(0);
+            if (!tokenId) throw new Error("Failed to retrieve Token ID from receipt");
+            console.log("Minted Token ID:", tokenId.toString());
+
+            // --- Step 3: Listing (Approve + List) ---
+            setProgressStep(3);
+            
+            // Approve Marketplace
+            setStatus("Approving Marketplace Contract...");
+            const marketplaceAddress = await contracts.ecoMarketplace.getAddress();
+            const txApprove = await contracts.ecoNFT.approve(marketplaceAddress, tokenId);
+            await txApprove.wait();
+
+            // List Project
+            setStatus("Listing Token for Sale...");
+            const priceWei = ethers.parseEther(formData.price.toString());
+            const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
+            await txList.wait();
+
+            setStatus("Project Successfully Launched!");
+            setProgressStep(4); // Done
+            
         } catch (error) {
             console.error(error);
-            setStatus(`Error: ${error.message}`);
+            setStatus(`Error: ${error.reason || error.message}`);
             setProgressStep(0);
         } finally {
             setIsMinting(false);
@@ -85,54 +123,108 @@ const AdminMint = () => {
 
     return (
         <div className="container mint-page">
-            <div className="card mint-card">
-                <h2>Create New Carbon Credit</h2>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Project Name</label>
-                        <input name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Amazon Reforestation" />
-                    </div>
-                    
-                    <div className="form-group">
-                        <label>Description</label>
-                        <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Project details..." />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Carbon Tons</label>
-                        <input name="tons" type="number" value={formData.tons} onChange={handleChange} placeholder="100" />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Expiry (Days)</label>
-                        <input name="expiryDays" type="number" value={formData.expiryDays} onChange={handleChange} />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Project Image</label>
-                        <input type="file" onChange={handleFileChange} accept="image/*" />
+            <h2 className="page-title">Deploy New Asset</h2>
+            
+            <div className="admin-grid">
+                {/* Left Column: Form */}
+                <div className="card form-card">
+                    {/* Progress Stepper */}
+                    <div className="stepper-container">
+                        <div className={`step-item ${progressStep >= 1 ? 'active' : ''} ${progressStep > 1 ? 'completed' : ''}`}>
+                            <div className="step-icon"><i className="fas fa-cloud-upload-alt"></i></div>
+                            <span>IPFS</span>
+                        </div>
+                        <div className={`step-line ${progressStep >= 2 ? 'active' : ''}`}></div>
+                        <div className={`step-item ${progressStep >= 2 ? 'active' : ''} ${progressStep > 2 ? 'completed' : ''}`}>
+                            <div className="step-icon"><i className="fas fa-cube"></i></div>
+                            <span>Mint</span>
+                        </div>
+                        <div className={`step-line ${progressStep >= 3 ? 'active' : ''}`}></div>
+                        <div className={`step-item ${progressStep >= 3 ? 'active' : ''} ${progressStep >= 3 ? 'completed' : ''}`}>
+                            <div className="step-icon"><i className="fas fa-tag"></i></div>
+                            <span>List</span>
+                        </div>
                     </div>
 
-                    {status && (
-                        <div className={`status-box step-${progressStep}`}>
-                            <p>{status}</p>
-                            {progressStep > 0 && (
-                                <div className="progress-indicators">
-                                    <span className={progressStep >= 1 ? "active" : ""}>IPFS</span>
-                                    <span className="arrow">→</span>
-                                    <span className={progressStep >= 2 ? "active" : ""}>Sign</span>
-                                    <span className="arrow">→</span>
-                                    <span className={progressStep >= 3 ? "active" : ""}>Confirm</span>
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-group">
+                            <label>Project Name</label>
+                            <input name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Amazon Reforestation" />
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Description</label>
+                            <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Project details and impact..." />
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group half">
+                                <label>Carbon Tons</label>
+                                <input name="tons" type="number" value={formData.tons} onChange={handleChange} placeholder="100" />
+                            </div>
+
+                            <div className="form-group half">
+                                <label>Expiry (Days)</label>
+                                <input name="expiryDays" type="number" value={formData.expiryDays} onChange={handleChange} />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Listing Price (ECO)</label>
+                            <input name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} placeholder="e.g. 500" />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Project Image</label>
+                            <div className="file-upload-wrapper">
+                                <input type="file" id="file-upload" onChange={handleFileChange} accept="image/*" hidden />
+                                <label htmlFor="file-upload" className="file-upload-label">
+                                    <i className="fas fa-image"></i> {file ? file.name : "Choose Image"}
+                                </label>
+                            </div>
+                        </div>
+
+                        {status && (
+                            <div className={`status-message ${status.includes("Error") ? "error" : "info"}`}>
+                                {isMinting && <i className="fas fa-circle-notch fa-spin"></i>}
+                                <span>{status}</span>
+                            </div>
+                        )}
+
+                        <button type="submit" className="btn-primary full-width" disabled={isMinting}>
+                            {isMinting ? "Processing Transaction..." : "Deploy to Blockchain"}
+                        </button>
+                    </form>
+                </div>
+
+                {/* Right Column: Live Preview */}
+                <div className="preview-column">
+                    <h3>Live Preview</h3>
+                    <div className="nft-card-preview">
+                        <div className="card-image-container">
+                            {preview ? (
+                                <img src={preview} alt="Preview" className={`preview-img ${progressStep === 1 ? 'scanning' : ''}`} />
+                            ) : (
+                                <div className="placeholder-image">
+                                    <i className="fas fa-leaf"></i>
                                 </div>
                             )}
+                            {progressStep === 1 && <div className="scan-line"></div>}
+                            <div className="card-badge">{formData.tons || '0'} Tons</div>
                         </div>
-                    )}
-
-                    <button type="submit" className="btn-primary" disabled={isMinting}>
-                        {isMinting ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-plus"></i>}
-                        Mint Token
-                    </button>
-                </form>
+                        <div className="card-content">
+                            <h4>{formData.name || 'Project Name'}</h4>
+                            <p className="card-desc">{formData.description || 'Description will appear here...'}</p>
+                            <div className="card-footer">
+                                <div className="price-tag">
+                                    <span className="label">Price</span>
+                                    <span className="value">{formData.price || '0'} ECO</span>
+                                </div>
+                                <button className="btn-outline btn-sm">Buy Now</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

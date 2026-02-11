@@ -79,3 +79,27 @@
     font-weight: bold;
     color: var(--warning);
 }
+
+.listing-input-group {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.price-input {
+    padding: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #222;
+    color: white;
+    width: 100%;
+}
+
+.button-group-row {
+    display: flex;
+    gap: 10px;
+}

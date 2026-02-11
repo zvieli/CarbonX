@@ -7,14 +7,17 @@ const Navbar = () => {
     const { account, connectWallet, isOwner } = useWeb3();
     const location = useLocation();
 
+    // Mock Faucet Function
+    const handleFaucet = () => {
+        alert("Faucet: 1000 ECO Tokens requested! (Logic to be implemented)");
+    };
+
     return (
         <nav className="navbar">
-            <div className="container navbar-container">
+            <div className="container navbar-container glass-panel">
                 <Link to="/" className="navbar-brand">
-                    <span className="icon">
-                        <img src="/op4.svg" alt="Logo" style={{ width: '100px', height: '100px' }} />
-                    </span>
-                    <span className="text">Proof Of Green</span>
+                    <img src="/op4.svg" alt="Logo" className="logo-icon" />
+                    <span className="text text-gradient">Proof Of Green</span>
                 </Link>
 
                 <div className="navbar-menu">
@@ -28,15 +31,20 @@ const Navbar = () => {
                         </Link>
                     )}
 
-                    <button 
-                        className="btn-primary" 
-                        onClick={account ? () => {} : connectWallet}
-                    >
-                        {account 
-                            ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` 
-                            : 'Connect Wallet'
-                        }
+                    <button className="btn-outline faucet-btn" onClick={handleFaucet}>
+                        <i className="fas fa-faucet"></i> Get Free ECO
                     </button>
+
+                    {account ? (
+                        <div className="wallet-badge">
+                            <span className="indicator"></span>
+                            {account.substring(0, 6)}...{account.substring(account.length - 4)}
+                        </div>
+                    ) : (
+                        <button className="btn-primary" onClick={connectWallet}>
+                            Connect Wallet
+                        </button>
+                    )}
                 </div>
             </div>
         </nav>

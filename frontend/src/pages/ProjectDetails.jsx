@@ -13,6 +13,9 @@ const ProjectDetails = () => {
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState("");
 
+    const [listingPrice, setListingPrice] = useState("");
+    const [showListingInput, setShowListingInput] = useState(false);
+
     useEffect(() => {
         if (contracts.ecoNFT && contracts.ecoMarketplace) {
             loadProjectDetails();
@@ -59,6 +62,40 @@ const ProjectDetails = () => {
             setStatus("Project not found.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleListProject = async () => {
+        if (!listingPrice || isNaN(listingPrice) || parseFloat(listingPrice) <= 0) {
+            setStatus("Invalid price");
+            return;
+        }
+
+        try {
+            setStatus("Approving Marketplace...");
+            const marketplaceAddress = await contracts.ecoMarketplace.getAddress();
+            
+            // 1. Approve (Double Transaction UX)
+            const approval = await contracts.ecoNFT.getApproved(id);
+            if (approval.toLowerCase() !== marketplaceAddress.toLowerCase()) {
+                 setStatus("Step 1/2: Approving Marketplace access... (Please sign)");
+                 const txApprove = await contracts.ecoNFT.approve(marketplaceAddress, id);
+                 await txApprove.wait();
+            }
+
+            setStatus("Step 2/2: Confirming Listing... (Please sign)");
+            
+            // 2. List
+            const priceWei = ethers.parseEther(listingPrice);
+            const txList = await contracts.ecoMarketplace.listProject(id, priceWei);
+            await txList.wait();
+
+            setStatus("Project Listed Successfully!");
+            setShowListingInput(false);
+            loadProjectDetails(); // Refresh
+        } catch (error) {
+            console.error(error);
+            setStatus("Listing failed: " + (error.reason || error.message));
         }
     };
 
@@ -120,7 +157,7 @@ const ProjectDetails = () => {
 
             console.log("Sending ETH:", ethEstimate);
 
-            setStatus("Buying with ETH (DeFi Swap)...");
+            setStatus(`Buying with ETH (DeFi Swap)... Est: ${ethEstimate.toFixed(5)} ETH`);
             const txBuy = await contracts.ecoMarketplace.buyWithETH(id, { value: valueToSend });
             await txBuy.wait();
 
@@ -176,10 +213,26 @@ const ProjectDetails = () => {
                     )}
 
                     <div className="actions">
-                        {isMyToken && !project.isRetired && !listing && (
-                            <button className="btn-secondary" onClick={() => alert("Listing feature in AdminMint for now")}>
+                        {isMyToken && !project.isRetired && !listing && !showListingInput && (
+                            <button className="btn-secondary" onClick={() => setShowListingInput(true)}>
                                 List for Sale
                             </button>
+                        )}
+                        
+                        {isMyToken && showListingInput && (
+                             <div className="listing-input-group">
+                                <input 
+                                    type="number" 
+                                    placeholder="Price in ECO" 
+                                    value={listingPrice}
+                                    onChange={(e) => setListingPrice(e.target.value)}
+                                    className="price-input"
+                                />
+                                <div className="button-group-row">
+                                    <button className="btn-primary" onClick={handleListProject}>Confirm Listing</button>
+                                    <button className="btn-secondary" onClick={() => setShowListingInput(false)}>Cancel</button>
+                                </div>
+                             </div>
                         )}
                         
                         {isMyToken && !project.isRetired && (
