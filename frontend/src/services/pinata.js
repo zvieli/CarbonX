@@ -74,8 +74,15 @@ export const testConnection = async () => {
   }
 };
 
-export const getGatewayUrl = (ipfsUri) => {
-  if (!ipfsUri) return "";
-  const cid = ipfsUri.replace("ipfs://", "");
-  return `https://${import.meta.env.PINATA_GATEWAY}/ipfs/${cid}`;
+export const getGatewayUrl = (uri) => {
+  if (!uri) return "";
+  
+  // If it's already an HTTP URL or a local path, return it as is
+  if (uri.startsWith("http") || uri.startsWith("/")) {
+    return uri;
+  }
+  
+  // Construct IPFS Gateway URL
+  const cid = uri.replace("ipfs://", "");
+  return `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${cid}`;
 };
