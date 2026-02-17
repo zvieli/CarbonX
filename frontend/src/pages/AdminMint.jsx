@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import { uploadToIPFS } from '../services/pinata';
+import { uploadToIPFS, testConnection } from '../services/pinata';
 import { ethers } from 'ethers';
 import './AdminMint.css';
 import './AdminMintStatus.css';
@@ -17,11 +17,25 @@ const AdminMint = () => {
     const [file, setFile] = useState(null);
     const [preview, setPreview] = useState(null); // Image Preview
     const [status, setStatus] = useState('');
+    const [pinataStatus, setPinataStatus] = useState(null); // 'checking', 'success', 'error'
     const [progressStep, setProgressStep] = useState(0); // 0: Idle, 1: IPFS, 2: Mint, 3: Approve, 4: List
     const [isMinting, setIsMinting] = useState(false);
 
     if (loading) return <div className="container">Loading...</div>;
     if (!isOwner) return <div className="container"><p className="error-text">Access Denied: Admin only.</p></div>;
+
+    const checkPinata = async () => {
+        setPinataStatus('checking');
+        setStatus('Checking IPFS Connection...');
+        const result = await testConnection();
+        if (result.success) {
+            setPinataStatus('success');
+            setStatus('IPFS Connection Verified');
+        } else {
+            setPinataStatus('error');
+            setStatus(`IPFS Error: ${result.message}`);
+        }
+    };
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -182,6 +196,14 @@ const AdminMint = () => {
                                     <i className="fas fa-image"></i> {file ? file.name : "Choose Image"}
                                 </label>
                             </div>
+                        </div>
+
+                        <div className="form-group">
+                             <button type="button" onClick={checkPinata} className="btn-secondary btn-sm" disabled={pinataStatus === 'checking'}>
+                                {pinataStatus === 'checking' ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-wifi"></i>} Check IPFS Connection
+                             </button>
+                             {pinataStatus === 'success' && <span className="text-success ml-2"> <i className="fas fa-check-circle"></i> Connected</span>}
+                             {pinataStatus === 'error' && <span className="text-error ml-2"> <i className="fas fa-times-circle"></i> Failed</span>}
                         </div>
 
                         {status && (

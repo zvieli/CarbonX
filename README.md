@@ -19,6 +19,29 @@ The project has been refactored from TypeScript/Ignition to standard **JavaScrip
 ## Installation
 
 1. Clone the repository.
+````markdown
+# EcoChain - POG (Proof of Green)
+
+This project implements an Eco-friendly NFT marketplace using **Hardhat**, **Ethers.js v6**, and **JavaScript (ESM)**. It allows for minting generic carbon credit projects as NFTs, trading them on a marketplace, and retiring them to offset carbon.
+
+The project has been refactored from TypeScript/Ignition to standard **JavaScript ESM** scripts for simplicity.
+
+## Features
+
+- **EcoNFT**: ERC721 Token representing carbon credit projects. Supports carbon tonnage tracking and retirement.
+- **EcoToken**: ERC20 Reward token.
+- **EcoMarketplace**: Marketplace to buy/sell EcoNFTs using ETH (swapped via Uniswap V3) or direct listing mechanisms.
+- **Mainnet Forking**: Tests run against a mainnet fork to utilize real Uniswap V3 pools and Chainlink Oracles.
+
+## Prerequisites
+
+- Node.js (v18+ recommended)
+- NPM or Yarn
+- Alchemy/Infura API Key (for Mainnet Forking in `hardhat.config.js`)
+
+## Installation
+
+1. Clone the repository.
 2. Install dependencies:
    ```shell
    npm install
@@ -27,24 +50,42 @@ The project has been refactored from TypeScript/Ignition to standard **JavaScrip
 
 ## Testing
 
-Run the test suite (includes Unit tests and Mainnet Fork integration tests):
+Run the test suite (includes Unit tests and Mainnet Fork integration tests) using the npm script:
 
 ```shell
-npx hardhat test
+npm run test
 ```
 
 ## Deployment
 
-This project uses standard Hardhat scripts (no Ignition).
+This project uses standard Hardhat scripts (no Ignition). Use the npm script to run the deploy script locally:
 
-To deploy to the local Hardhat Network:
 ```shell
-npx hardhat run scripts/deploy.js
+npm run deploy
 ```
 
-To deploy to a specific network (e.g., localhost or sepolia):
+To deploy to a specific network (for example `localhost`), pass the network flag through the npm script:
+
 ```shell
-npx hardhat run scripts/deploy.js --network localhost
+npm run deploy -- --network localhost
+```
+
+## Running a local Hardhat node (fork)
+
+Start a local Hardhat node that forks mainnet (make sure your forking URL in the `node` script is correct):
+
+```shell
+npm run node
+```
+
+This will run the command defined in `package.json` which includes the `--fork` option.
+
+## Frontend
+
+Start the frontend dev server from the project root:
+
+```shell
+npm run front
 ```
 
 ## Project Structure
@@ -57,3 +98,5 @@ npx hardhat run scripts/deploy.js --network localhost
 ## License
 
 MIT
+
+````

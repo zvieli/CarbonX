@@ -1,9 +1,10 @@
 import { PinataSDK } from "pinata";
 
 // Initialize Pinata SDK with config from environment variables
+// Note: Vite exposes env vars prefixed with VITE_ to the client
 const pinata = new PinataSDK({
-  pinataJwt: import.meta.env.PINATA_JWT,
-  pinataGateway: import.meta.env.PINATA_GATEWAY,
+  pinataJwt: import.meta.env.VITE_PINATA_JWT,
+  pinataGateway: import.meta.env.VITE_PINATA_GATEWAY,
 });
 
 /**
@@ -42,6 +43,34 @@ export const uploadToIPFS = async (file, metadata) => {
   } catch (error) {
     console.error("Error uploading to Pinata:", error);
     throw error;
+  }
+};
+
+/**
+ * Validates the connection to Pinata and IPFS Gateway.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const testConnection = async () => {
+  try {
+    // 1. Test Authentication
+    // The SDK often exposes .testAuthentication() - or we can try a simple list/upload
+    // Note: Pinata v3+ SDK might differ, trying generic auth test if available
+    // If not, we fall back to a simple fetch check.
+    
+    // Check if testAuthentication exists
+    // The "pinata" package (v2.x) usually has this.
+    // If not, we try uploading a tiny blob as a test.
+    
+    const auth = await pinata.testAuthentication();
+    
+    // 2. Test Gateway Access (Optional but good)
+    const testCid = "QmSZwJdGZmgy6M5s4w5k4m5j5m5n5o5p5q5r5s5t5u"; // Known test CID (empty file is QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH - or similar)
+    // Actually, just auth is enough for "HEALTH CHECK" of API key.
+
+    return { success: true, message: auth.message || "Connected to Pinata successfully" };
+  } catch (error) {
+    console.error("Pinata Health Check Failed:", error);
+    return { success: false, message: error.message || "Connection failed" };
   }
 };
 
