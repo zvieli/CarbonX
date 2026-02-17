@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { getGatewayUrl } from '../services/pinata';
+import MarketStats from '../components/MarketStats';
 import './Marketplace.css';
+
 
 const Marketplace = () => {
     const { contracts } = useWeb3();
@@ -87,8 +89,10 @@ const Marketplace = () => {
 
     return (
         <div className="container">
+            <MarketStats />
             <div className="marketplace-header glass-panel" style={{marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div>
+
                    <h1 className="text-gradient">Marketplace</h1>
                    <p style={{color: 'var(--text-secondary)'}}>Discover verified carbon offsets.</p>
                 </div>

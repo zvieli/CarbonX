@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { getGatewayUrl } from '../services/pinata';
+import { getPrices } from '../services/PriceOracleService';
 import './ProjectDetails.css';
 
 const ProjectDetails = () => {
@@ -143,21 +144,27 @@ const ProjectDetails = () => {
     const buyWithEth = async () => {
         if (!listing) return;
         try {
-            setStatus("Calculating Swap...");
-            // Estimate: 100 ECO ~ 0.04 ETH. We send safety margin.
-            // In production we would query Quoter, but for this demo we send generous amount.
-            // 2500 ECO = 1 ETH -> 1 ECO = 0.0004 ETH
-            // Listing Price (ECO) * 0.0004 = Clean Cost
-            // We multiply by 1.5 for safety (slippage + fees)
-            // Note: Contract refunds excess.
+            setStatus("Calculating minimal ETH required...");
             
-            const priceEco = parseFloat(listing.price);
-            const ethEstimate = (priceEco / 2500) * 1.5; 
-            const valueToSend = ethers.parseEther(ethEstimate.toFixed(18));
+            // 1. Get Real-time Price
+            const prices = await getPrices();
+            const ecoPerEth = parseFloat(prices.ecoEth); // e.g., 2500
+            if (!ecoPerEth || ecoPerEth <= 0) throw new Error("Price feed unavailable");
 
-            console.log("Sending ETH:", ethEstimate);
+            // 2. Calculate ETH needed (with safety margin)
+            // Listing Price (ECO) / (ECO per ETH) = ETH Base Cost
+            // We add 2% slippage protection locally to ensure tx doesn't fail due to small price moves
+            const listingPriceECO = parseFloat(listing.price);
+            const ethBaseCost = listingPriceECO / ecoPerEth;
+            const ethWithSlippage = ethBaseCost * 1.05; // 5% buffer (contract refunds difference)
 
-            setStatus(`Buying with ETH (DeFi Swap)... Est: ${ethEstimate.toFixed(5)} ETH`);
+            console.log(`Price: 1 ETH = ${ecoPerEth} ECO`);
+            console.log(`Cost: ${listingPriceECO} ECO -> ${ethBaseCost} ETH`);
+            console.log(`Sending: ${ethWithSlippage} ETH (Safety buffer included)`);
+
+            setStatus(`Buying with ETH (DeFi Swap)... Sending ~${ethWithSlippage.toFixed(5)} ETH`);
+            
+            const valueToSend = ethers.parseEther(ethWithSlippage.toFixed(18));
             const txBuy = await contracts.ecoMarketplace.buyWithETH(id, { value: valueToSend });
             await txBuy.wait();
 
@@ -168,6 +175,7 @@ const ProjectDetails = () => {
             setStatus("DeFi Purchase failed: " + (error.reason || error.message));
         }
     };
+
 
     if (loading) return <div className="container">Loading...</div>;
     if (!project) return <div className="container">not found</div>;

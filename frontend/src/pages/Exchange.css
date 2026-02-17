@@ -1,0 +1,228 @@
+.exchange-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 20px;
+}
+
+.swap-box {
+    width: 100%;
+    max-width: 480px;
+    padding: 2rem;
+    border-radius: 24px;
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.swap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.swap-header h2 {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.swap-header p {
+    margin: 5px 0 0;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.swap-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Slightly tighter gap to account for arrow */
+}
+
+.input-container {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 20px;
+    padding: 1.2rem;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.input-container:hover, .input-container:focus-within {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.label-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.balance {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.input-row input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 600;
+    width: 100%;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+}
+
+.input-row input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+/* Token Badges */
+.token-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: default;
+    min-width: 100px;
+    justify-content: center;
+}
+
+.token-badge.eco {
+    background: rgba(0, 255, 157, 0.15);
+    color: #00ff9d;
+    border: 1px solid rgba(0, 255, 157, 0.2);
+}
+
+/* Swap Arrow Button */
+.swap-arrow-container {
+    display: flex;
+    justify-content: center;
+    margin: -24px 0; /* Huge negative margin to center on gap */
+    z-index: 10;
+    position: relative;
+    cursor: pointer;
+}
+
+.swap-arrow-circle {
+    background: #212429;
+    border: 4px solid #0d1117; /* Matches page background roughly */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.swap-arrow-container:hover .swap-arrow-circle {
+    transform: rotate(180deg) scale(1.1);
+    background: #3a3f47;
+    color: #00ff9d;
+    border-color: #00ff9d;
+}
+
+/* Action Buttons */
+.swap-btn {
+    margin-top: 1.5rem;
+    width: 100%;
+    padding: 1.2rem;
+    border: none;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: capitalize;
+}
+
+.swap-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+
+.swap-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Button Variants */
+.swap-btn.connect-mode {
+    background: rgba(64, 126, 255, 0.2);
+    color: #407eff;
+    border: 1px solid rgba(64, 126, 255, 0.4);
+}
+
+.swap-btn.approve-mode {
+    background: linear-gradient(135deg, #FFB800 0%, #FF8A00 100%);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(255, 184, 0, 0.3);
+}
+
+.swap-btn.swap-mode {
+    background: linear-gradient(135deg, #00ff9d 0%, #00b8ff 100%);
+    color: #000;
+    box-shadow: 0 4px 15px rgba(0, 255, 157, 0.3);
+}
+
+/* Status Messages */
+.status-msg {
+    margin-top: 1rem;
+    text-align: center;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.status-msg.success {
+    background: rgba(0, 255, 157, 0.15);
+    color: #00ff9d;
+    border: 1px solid rgba(0, 255, 157, 0.2);
+}
+
+.status-msg.error {
+    background: rgba(255, 99, 71, 0.15);
+    color: #ff6347;
+    border: 1px solid rgba(255, 99, 71, 0.2);
+}
+
+.price-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 0.5rem 0.5rem 0;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

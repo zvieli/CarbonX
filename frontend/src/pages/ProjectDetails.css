@@ -12,12 +12,17 @@
 }
 
 .details-image {
-    padding: 0.5rem;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    min-height: 400px;
 }
 
 .details-image img {
     width: 100%;
-    border-radius: 0.5rem;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
 }
 
 .details-info h1 {
@@ -102,4 +107,43 @@
 .button-group-row {
     display: flex;
     gap: 10px;
+}
+
+.listing-info {
+    margin-bottom: 2rem; /* Added spacing */
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid var(--accent-primary);
+}
+
+.listing-info h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.listing-info .price-tag {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+}
+
+.buy-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    border-color: white;
+    color: white;
 }
