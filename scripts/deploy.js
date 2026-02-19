@@ -61,20 +61,44 @@ async function main() {
     const ecoTokenAddress = await ecoToken.getAddress();
     console.log("✅ EcoToken deployed to:", ecoTokenAddress);
 
-    // 3. Create Uniswap V3 Pool (WETH / EcoToken)
-    console.log("🌊 Creating Liquidity Pool...");
+    // 3. Create Uniswap V3 Pool (WETH / EcoToken) - Concentrated Liquidity
+    console.log("🌊 Creating Concentrated Liquidity Pool...");
     
     // Sort tokens strictly by address (Uniswap Requirement)
     const token0 = BigInt(ARTIFACTS.WETH) < BigInt(ecoTokenAddress) ? ARTIFACTS.WETH : ecoTokenAddress;
     const token1 = BigInt(ARTIFACTS.WETH) < BigInt(ecoTokenAddress) ? ecoTokenAddress : ARTIFACTS.WETH;
     const fee = 3000; // 0.3%
 
-    // Initialize Pool Price (1 ETH = 2500 ECO)
-    let priceRatio = token0 === ARTIFACTS.WETH ? 2500 : 1/2500;
-    const sqrtPriceX96 = encodePriceSqrt(priceRatio, 1);
+    // Calculate initial price and ticks based on token ordering
+    let sqrtPriceX96;
+    let tickLower, tickUpper;
+
+    // We proceed assuming WETH is approximately 2500 ECO
+    // If token0 is WETH, price is ~2500 ECO per WETH (Price = token1/token0 = ECO/WETH)
+    // If token0 is ECO, price is ~1/2500 WETH per ECO (Price = token1/token0 = WETH/ECO)
+    
+    if (token0 === ARTIFACTS.WETH) {
+        // Price = 2500
+        // sqrtPrice = 50
+        // sqrtPriceX96 = 50 * 2^96
+        console.log("🔹 Token0 is WETH (Price ~ 2500 ECO/ETH)");
+        sqrtPriceX96 = BigInt(50) * (2n ** 96n);
+        tickLower = 76200;
+        tickUpper = 80100;
+    } else {
+        // Price = 1/2500
+        // sqrtPrice = 1/50 = 0.02
+        // sqrtPriceX96 = 0.02 * 2^96 = 2^96 / 50
+        console.log("🔹 Token0 is ECO (Price ~ 0.0004 ETH/ECO)");
+        sqrtPriceX96 = (2n ** 96n) / 50n;
+        tickLower = -80100;
+        tickUpper = -76200;
+    }
 
     const nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", ARTIFACTS.NonfungiblePositionManager);
     
+    // Initialize Pool
+    console.log("Initializing pool with SqrtPriceX96:", sqrtPriceX96.toString());
     await nftPositionManager.createAndInitializePoolIfNecessary(
       token0,
       token1,
@@ -83,16 +107,17 @@ async function main() {
     );
     console.log("✅ Pool Created & Initialized");
 
-    // 4. Add Liquidity
-    console.log("💧 Adding Initial Liquidity...");
+    // 4. Add Concentrated Liquidity
+    console.log("💧 Adding Concentrated Liquidity...");
     
-    const amountEco = ethers.parseEther("250000"); // 250k ECO
-    const amountEth = ethers.parseEther("100");    // 100 ETH
+    const amountEco = ethers.parseEther("25000"); // 25k ECO
+    const amountEth = ethers.parseEther("10");    // 10 ETH
 
     // Approve Position Manager to spend ECO
     await ecoToken.approve(ARTIFACTS.NonfungiblePositionManager, ethers.MaxUint256);
     
-    // Wrap ETH to WETH and Approve (Deposite EXTRA to prevent STF due to rounding)
+    // Wrap ETH to WETH and Approve
+    // We wrap extra to be safe
     const weth = await ethers.getContractAt("contracts/TestInterfaces.sol:IWETH", ARTIFACTS.WETH);
     await weth.deposit({ value: amountEth * 2n });
     await weth.approve(ARTIFACTS.NonfungiblePositionManager, ethers.MaxUint256);
@@ -101,19 +126,28 @@ async function main() {
       token0: token0,
       token1: token1,
       fee: fee,
-      tickLower: -887220, // Full Range
-      tickUpper: 887220,
+      tickLower: tickLower,
+      tickUpper: tickUpper,
       amount0Desired: token0 === ARTIFACTS.WETH ? amountEth : amountEco,
-      amount1Desired: token1 === ARTIFACTS.WETH ? amountEco : amountEth,
-      amount0Min: 0,
-      amount1Min: 0,
+      amount1Desired: token1 === ARTIFACTS.WETH ? amountEth : amountEco,
+      amount0Min: 0, 
+      amount1Min: 0, 
       recipient: deployer.address,
       deadline: Math.floor(Date.now() / 1000) + 60 * 10
     };
 
+    console.log("Mint Params:", {
+        token0, 
+        token1, 
+        tickLower, 
+        tickUpper, 
+        amount0: params.amount0Desired.toString(), 
+        amount1: params.amount1Desired.toString()
+    });
+
     const tx = await nftPositionManager.mint(params);
     await tx.wait();
-    console.log("✅ Liquidity Added successfully");
+    console.log("✅ Concentrated Liquidity Added successfully");
 
     // 5. Deploy EcoMarketplace
     const EcoMarketplace = await ethers.getContractFactory("EcoMarketplace");

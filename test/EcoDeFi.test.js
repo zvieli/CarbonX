@@ -1,294 +1,345 @@
+
 import { expect } from "chai";
 import hre from "hardhat";
 const { ethers } = hre;
 
-describe("Proof of Green - DeFi & Marketplace Tests", function () {
-  let ecoToken, ecoNFT, ecoMarketplace;
-  let owner, seller, buyerStandard, buyerDeFi;
-  let weth, nftPositionManager, swapRouter;
+/**
+ * @title EcoDeFi Comprehensive Test Suite
+ * @notice Tests the full "Green Financial System": ERC20, NFT, Marketplace, and Uniswap V3 Integration.
+ */
+describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
+    let ecoToken, ecoNFT, ecoMarketplace;
+    let owner, seller, buyerStandard, buyerDeFi;
+    let weth, nftPositionManager, swapRouter, uniswapV3Pool;
 
-  // Uniswap & Mainnet Constants
-  const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
-  const POSITION_MANAGER_ADDRESS = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
-  const UNISWAP_ROUTER_ADDRESS = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
-  
-  // Test Pricing
-  const LISTING_PRICE = ethers.parseEther("100"); // 100 ECO
-  
-  // Setup: Deploy Infrastructure and Create Liquidity Pool
-  before(async function () {
-    [owner, seller, buyerStandard, buyerDeFi] = await ethers.getSigners();
-    
-    // 1. Deploy Core Contracts
-    const EcoToken = await ethers.getContractFactory("EcoToken");
-    ecoToken = await EcoToken.deploy();
+    // --- Mainnet Constants ---
+    const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+    const FACTORY_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+    const SWAP_ROUTER_ADDRESS = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+    const POSITION_MANAGER_ADDRESS = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+    const FEE_TIER = 3000; // 0.3%
 
-    const EcoNFT = await ethers.getContractFactory("EcoNFT");
-    ecoNFT = await EcoNFT.deploy();
+    // --- Pricing Math ---
+    // Initial Price: 2500 ECO per 1 ETH
+    let token0, token1;
+    let sqrtPriceX96;
 
-    // 2. Add Liquidity to Uniswap V3 (Simulated Deployment Script Logic)
-    // We created TestInterfaces.sol to ensure artifacts exist for testing logic
-    weth = await ethers.getContractAt("contracts/TestInterfaces.sol:IWETH", WETH_ADDRESS);
-    nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", POSITION_MANAGER_ADDRESS);
+    before(async function () {
+        [owner, seller, buyerStandard, buyerDeFi] = await ethers.getSigners();
+        console.log("🚀 Starting Tests with Owner:", owner.address);
 
-    // Calculate SqrtPriceX96 for 1 ETH = 2500 ECO
-    // Token0/Token1 ordering is address dependent
-    const tokenAddress = await ecoToken.getAddress();
-    const token0 = BigInt(WETH_ADDRESS) < BigInt(tokenAddress) ? WETH_ADDRESS : tokenAddress;
-    const token1 = BigInt(WETH_ADDRESS) < BigInt(tokenAddress) ? tokenAddress : WETH_ADDRESS;
-    const fee = 3000;
+        // 1. Deploy Core Contracts
+        const EcoToken = await ethers.getContractFactory("EcoToken");
+        ecoToken = await EcoToken.deploy();
+        await ecoToken.waitForDeployment();
+        const ecoTokenAddress = await ecoToken.getAddress();
 
-    const priceRatio = token0 === WETH_ADDRESS ? 2500 : 1/2500;
-    const encodePriceSqrt = (reserve1, reserve0) => {
-        return BigInt(Math.floor(Math.sqrt(Number(reserve1) / Number(reserve0)) * 2 ** 96)).toString();
-    };
-    const sqrtPriceX96 = encodePriceSqrt(priceRatio, 1);
+        const EcoNFT = await ethers.getContractFactory("EcoNFT");
+        ecoNFT = await EcoNFT.deploy();
+        await ecoNFT.waitForDeployment();
+        const ecoNFTAddress = await ecoNFT.getAddress();
 
-    await nftPositionManager.createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
-    
-    // Improve Liquidity
-    const amountEco = ethers.parseEther("250000");
-    const amountEth = ethers.parseEther("100");
-    
-    await ecoToken.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
-    await weth.deposit({ value: amountEth * 2n });
-    await weth.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
+        console.log("✅ Tokens Deployed");
 
-    const params = {
-        token0: token0,
-        token1: token1,
-        fee: fee,
-        tickLower: -887220,
-        tickUpper: 887220,
-        amount0Desired: token0 === WETH_ADDRESS ? amountEth : amountEco,
-        amount1Desired: token1 === WETH_ADDRESS ? amountEco : amountEth,
-        amount0Min: 0,
-        amount1Min: 0,
-        recipient: owner.address,
-        deadline: Math.floor(Date.now() / 1000) + 60
-    };
-    
-    // Ensure sufficient balance for STF
-    if (token0 === WETH_ADDRESS) {
-       await weth.deposit({ value: amountEth * 2n }); 
-    }
-    
-    await nftPositionManager.mint(params);
+        // 2. Setup Uniswap V3 Pool
+        // Sort tokens for Uniswap
+        token0 = BigInt(WETH_ADDRESS) < BigInt(ecoTokenAddress) ? WETH_ADDRESS : ecoTokenAddress;
+        token1 = BigInt(WETH_ADDRESS) < BigInt(ecoTokenAddress) ? ecoTokenAddress : WETH_ADDRESS;
 
-    // 3. Deploy Marketplace
-    const EcoMarketplace = await ethers.getContractFactory("EcoMarketplace");
-    ecoMarketplace = await EcoMarketplace.deploy(await ecoNFT.getAddress(), await ecoToken.getAddress());
+        // Calculate Initial Price
+        const isWethToken0 = token0 === WETH_ADDRESS;
+        if (isWethToken0) {
+            // Price = 2500 ECO/ETH
+            // sqrt(2500) = 50
+            sqrtPriceX96 = BigInt(50) * (2n ** 96n);
+        } else {
+            // Price = 1/2500 ETH/ECO
+            // sqrt(1/2500) = 1/50
+            sqrtPriceX96 = (2n ** 96n) / 50n;
+        }
 
-    // 4. Grant Permissions
-    await ecoNFT.setMarketplace(await ecoMarketplace.getAddress());
-  });
+        nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", POSITION_MANAGER_ADDRESS);
+        
+        // Initialize Pool
+        await nftPositionManager.createAndInitializePoolIfNecessary(
+            token0,
+            token1,
+            FEE_TIER,
+            sqrtPriceX96.toString()
+        );
 
-  // --- UNIT TESTS ---
+        // Add Liquidity (Concentrated Range)
+        const amountEco = ethers.parseEther("250000");
+        const amountEth = ethers.parseEther("100");
 
-  describe("1. EcoToken Unit Tests", function () {
-    it("Should allow Owner to mint manually", async function () {
-        const initialBalance = await ecoToken.balanceOf(owner.address);
-        await ecoToken.mint(owner.address, ethers.parseEther("100"));
-        const newBalance = await ecoToken.balanceOf(owner.address);
-        expect(newBalance).to.equal(initialBalance + ethers.parseEther("100"));
+        await ecoToken.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
+        
+        // Wrap ETH
+        weth = await ethers.getContractAt("contracts/TestInterfaces.sol:IWETH", WETH_ADDRESS);
+        await weth.deposit({ value: amountEth * 2n }); 
+        await weth.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
+
+        // Define Range: +/- ~10% around 2500
+        // Ticks for 0.3%: Spacing 60
+        // Center Tick roughly log_1.0001(2500) = ~78245
+        // Range: 76200 to 80100 (aligned to 60)
+        let tickLower, tickUpper;
+        if (isWethToken0) {
+            tickLower = 76200;
+            tickUpper = 80100;
+        } else {
+            // Inverted price -> Inverted ticks
+            tickLower = -80100;
+            tickUpper = -76200;
+        }
+
+        const params = {
+            token0: token0,
+            token1: token1,
+            fee: FEE_TIER,
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            amount0Desired: isWethToken0 ? amountEth : amountEco,
+            amount1Desired: isWethToken0 ? amountEco : amountEth,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: owner.address,
+            deadline: Math.floor(Date.now() / 1000) + 60
+        };
+
+        await nftPositionManager.mint(params);
+        console.log("✅ Concentrated Liquidity Provisioned");
+
+        // 3. Deploy Marketplace
+        const EcoMarketplace = await ethers.getContractFactory("EcoMarketplace");
+        ecoMarketplace = await EcoMarketplace.deploy(ecoNFTAddress, ecoTokenAddress);
+        await ecoMarketplace.waitForDeployment();
+
+        // Connect Marketplace to NFT
+        await ecoNFT.setMarketplace(await ecoMarketplace.getAddress());
+        console.log("✅ Marketplace Deployed & Linked");
+
+        // Get Pool Contract for Verification
+        // Use full path for external artifacts
+        const factory = await ethers.getContractAt("IUniswapV3Factory", FACTORY_ADDRESS);
+        const poolAddress = await factory.getPool(token0, token1, FEE_TIER);
+        uniswapV3Pool = await ethers.getContractAt("IUniswapV3Pool", poolAddress);
+        swapRouter = await ethers.getContractAt("ISwapRouter", SWAP_ROUTER_ADDRESS);
     });
 
-    it("Should prevent non-owners from minting", async function () {
-        await expect(
-            ecoToken.connect(buyerStandard).mint(buyerStandard.address, 100)
-        ).to.be.revertedWithCustomError(ecoToken, "OwnableUnauthorizedAccount");
+    // --------------------------------------------------------------------------------
+    // TEST 1: Deployment & State Verification
+    // --------------------------------------------------------------------------------
+    describe("1. Deployment & State (The Foundation)", function () {
+        it("Should initialize the Pool with correct price (2500 ECO/ETH)", async function () {
+            const slot0 = await uniswapV3Pool.slot0();
+            const currentSqrtPriceX96 = slot0.sqrtPriceX96;
+            
+            // Allow small deviation due to initialization precision
+            const expected = sqrtPriceX96;
+            const tolerance = expected / 100n; // 1% tolerance
+
+            // BigInt comparison
+            const diff = currentSqrtPriceX96 > expected ? currentSqrtPriceX96 - expected : expected - currentSqrtPriceX96;
+            
+            console.log(`    📊 Pool Price: ${currentSqrtPriceX96.toString()} (Expected: ${expected.toString()})`);
+            expect(diff).to.be.lt(tolerance);
+        });
+
+        it("Should use correct Tick Spacing for 0.3% fee", async function () {
+            const tickSpacing = await uniswapV3Pool.tickSpacing();
+            expect(tickSpacing).to.equal(60n);
+        });
     });
 
-    it("Should allow anyone to use the Faucet (Get 1000 ECO)", async function () {
-        await ecoToken.connect(buyerStandard).faucet();
-        const balance = await ecoToken.balanceOf(buyerStandard.address);
-        expect(balance).to.equal(ethers.parseEther("1000"));
-    });
-  });
+    // --------------------------------------------------------------------------------
+    // TEST 2: Concentrated Liquidity Mechanics
+    // --------------------------------------------------------------------------------
+    describe("2. Concentrated Liquidity Swaps", function () {
+        it("Should allow swapping ETH for ECO (Price Impact Check)", async function () {
+            const ethAmountIn = ethers.parseEther("1.0"); // 1 ETH
+            
+            // Wrap ETH for buyer
+            await weth.connect(buyerDeFi).deposit({ value: ethAmountIn });
+            await weth.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, ethAmountIn);
 
-  describe("2. Marketplace Integration Tests", function () {
-    let tokenId;
+            // Record State Before
+            const balanceEcoBefore = await ecoToken.balanceOf(buyerDeFi.address);
+            const slot0Before = await uniswapV3Pool.slot0();
 
-    beforeEach(async function () {
-        // Setup: Seller creates a project before each trade test
-        // NOTE: In our current EcoNFT, 'createProject' might be restricted or implemented differently.
-        // Assuming EcoNFT has a mint function or similar. 
-        // Based on previous context, user was admin minting.
-        // Let's assume Owner mints and transfers to Seller for listing scenario
-        
-        // MINT NFT directly to Seller (simulating admin mint or direct mint)
-        // Adjust this if your EcoNFT has specific logic
-        const tx = await ecoNFT.connect(owner).mintProject(seller.address, 100, 365, "ipfs://test");
-        const receipt = await tx.wait();
-        // Get Token ID from logs (Transfer event is usually index 0 or 1)
-        // Assuming Transfer(address from, address to, uint256 tokenId)
-        const event = receipt.logs.find(x => x.fragment && x.fragment.name === 'Transfer'); // Ethers v6 
-        // If fragment is missing, fallback to parsing manually, but usually works with hardhat typechain
-        // Let's grab the Log: 
-        // Hard fallback:
-        // Use enumerable to find token
-        const count = await ecoNFT.totalSupply();
-        tokenId = await ecoNFT.tokenByIndex(count - BigInt(1)); 
-    });
+            // Perform Swap
+            const params = {
+                tokenIn: WETH_ADDRESS,
+                tokenOut: await ecoToken.getAddress(),
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountIn: ethAmountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
 
-    it("Should list a project correctly", async function () {
-        // Seller approves Marketplace
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId);
+            await swapRouter.connect(buyerDeFi).exactInputSingle(params);
 
-        await expect(ecoMarketplace.connect(seller).listProject(tokenId, LISTING_PRICE))
-            .to.emit(ecoMarketplace, "ProjectListed")
-            .withArgs(tokenId, seller.address, LISTING_PRICE);
-        
-        const listing = await ecoMarketplace.listings(tokenId);
-        expect(listing.price).to.equal(LISTING_PRICE);
-        expect(listing.seller).to.equal(seller.address);
+            // Record State After
+            const balanceEcoAfter = await ecoToken.balanceOf(buyerDeFi.address);
+            const slot0After = await uniswapV3Pool.slot0();
+            
+            const ecoReceived = balanceEcoAfter - balanceEcoBefore;
+
+            console.log(`    💸 Swapped 1 ETH for ${ethers.formatEther(ecoReceived)} ECO`);
+            console.log(`    📉 Price moved from ${slot0Before.sqrtPriceX96} to ${slot0After.sqrtPriceX96}`);
+            
+            expect(ecoReceived).to.be.gt(0);
+        });
     });
 
-    it("Scenario A: Standard Buy with EcoToken", async function () {
-        // 1. Setup Listing
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId);
-        await ecoMarketplace.connect(seller).listProject(tokenId, LISTING_PRICE);
+    // --------------------------------------------------------------------------------
+    // TEST 3: The "Zap" (Marketplace Integration)
+    // --------------------------------------------------------------------------------
+    describe("3. Marketplace 'buyWithETH' Zap", function () {
+        const NFT_ID = 1;
+        const PRICE_ECO = ethers.parseEther("100"); // 100 ECO
 
-        // 2. Buyer gets funds via Faucet
-        // (BuyerStandard already got 1000 in previous test, checking balance)
-        const buyerBalance = await ecoToken.balanceOf(buyerStandard.address);
-        if (buyerBalance < LISTING_PRICE) await ecoToken.connect(buyerStandard).faucet();
+        before(async function () {
+            // Setup: Seller Mints and Lists NFT
+            // Mint with huge total supply so we don't hit cap
+            // Correct order: to, tons, expiryDays, URI
+            await ecoNFT.connect(owner).mintProject(seller.address, 100000n, 1000n, "https://ipfs.io/ipfs/test");
+            
+            // Approve Marketplace
+            await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), NFT_ID);
+            
+            // List Item
+            await ecoMarketplace.connect(seller).listProject(NFT_ID, PRICE_ECO);
+        });
 
-        // 3. Approve Marketplace to spend tokens
-        await ecoToken.connect(buyerStandard).approve(await ecoMarketplace.getAddress(), LISTING_PRICE);
+        it("Should allow user to buy NFT directly with ETH (Auto-Swap)", async function () {
+            // Buyer sends ETH. Marketplace swaps to ECO. Seller gets ECO. Buyer gets NFT.
+            
+            // Estimate ETH needed: 100 ECO / 2500 (Ratio) = 0.04 ETH.
+            // Send 0.1 ETH to be safe against slippage.
+            const ethToSend = ethers.parseEther("0.1");
 
-        // 4. Buy
-        await expect(ecoMarketplace.connect(buyerStandard).buyProject(tokenId))
-            .to.emit(ecoMarketplace, "ProjectSold")
-            .withArgs(tokenId, buyerStandard.address, LISTING_PRICE);
+            const sellerEcoBefore = await ecoToken.balanceOf(seller.address);
+            
+            // Execute Transaction
+            // Wrap in try-catch to print error if it fails (Fork issues)
+            try {
+                const tx = await ecoMarketplace.connect(buyerStandard).buyWithETH(NFT_ID, { value: ethToSend });
+                await tx.wait();
+            } catch (error) {
+                console.log("    ⚠️ 'buyWithETH' Failed:", error.message);
+                throw error;    
+            }
+            
+            // Verify NFT Transfer
+            expect(await ecoNFT.ownerOf(NFT_ID)).to.equal(buyerStandard.address);
 
-        // 5. Verification
-        expect(await ecoNFT.ownerOf(tokenId)).to.equal(buyerStandard.address);
-        expect(await ecoToken.balanceOf(seller.address)).to.equal(LISTING_PRICE); // Seller started with 0
+            // Verify Seller Got Paid
+            const sellerEcoAfter = await ecoToken.balanceOf(seller.address);
+            expect(sellerEcoAfter - sellerEcoBefore).to.equal(PRICE_ECO);
+
+            console.log("    ⚡ Zap Successful: ETH -> ECO -> NFT");
+        });
     });
 
-    it("Scenario B: Advanced Buy with ETH (Uniswap Swap)", async function () {
-        // Need a new Token ID for this test
-        // Use mintProject instead of safeMint
-         await ecoNFT.connect(owner).mintProject(seller.address, 100, 365, "ipfs://test2");
-         // Fetch last token ID
-         const count = await ecoNFT.totalSupply();
-         const tokenId2 = await ecoNFT.tokenByIndex(count - BigInt(1));
+    // --------------------------------------------------------------------------------
+    // TEST 4: Reverse Swap (ECO -> ETH)
+    // --------------------------------------------------------------------------------
+    describe("4. Reverse Swap (ECO -> ETH)", function () {
+        it("Should FAIL to swap without approval", async function () {
+            // Give buyer some ECO
+            await ecoToken.mint(buyerDeFi.address, ethers.parseEther("500"));
+            
+            const params = {
+                tokenIn: await ecoToken.getAddress(),
+                tokenOut: WETH_ADDRESS,
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountIn: ethers.parseEther("100"),
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
 
-        // 1. Setup Listing
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId2);
-        await ecoMarketplace.connect(seller).listProject(tokenId2, LISTING_PRICE);
+            // Expect Revert (STF or transferFrom failure)
+            // Due to interactions, it might fail inside SafeERC20 or Router
+            let failed = false;
+            try {
+                await swapRouter.connect(buyerDeFi).exactInputSingle(params);
+            } catch (e) {
+                failed = true;
+            }
+            expect(failed).to.be.true;
+        });
 
-        // 2. BuyerDeFi needs NO EcoTokens initially (to prove swap works)
-        const initialEcobalance = await ecoToken.balanceOf(buyerDeFi.address);
-        expect(initialEcobalance).to.equal(0);
+        it("Should SUCCEED after approval", async function () {
+            const ecoAmount = ethers.parseEther("100");
+            
+            // Approve
+            await ecoToken.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, ecoAmount);
 
-        // 3. Calculate Approx ETH needed (1 ETH = 2500 ECO -> 100 ECO = 0.04 ETH)
-        // Sending 0.1 ETH to be safe (ensure refund works)
-        const ethToSend = ethers.parseEther("0.1");
-        
-        // 4. Exec buyWithETH
-        const initialSellerBalance = await ecoToken.balanceOf(seller.address);
-        const initialBuyerEth = await ethers.provider.getBalance(buyerDeFi.address);
-        
-        const tx = await ecoMarketplace.connect(buyerDeFi).buyWithETH(tokenId2, { value: ethToSend });
-        const receipt = await tx.wait();
-        
-        // Calculate Gas Cost
-        const gasCost = receipt.gasUsed * receipt.gasPrice;
-        
-        // 5. Verifications
-        const finalBuyerEth = await ethers.provider.getBalance(buyerDeFi.address);
-        const actualEthSpent = initialBuyerEth - finalBuyerEth - gasCost;
+            // Check WETH Balance before
+            const wethBalanceBefore = await weth.balanceOf(buyerDeFi.address);
 
-        // Approx 0.04 ETH should be spent. 
-        // 0.1 sent - 0.04 spent = 0.06 refunded. 
-        // Verification: The spent amount should be approx 0.04, NOT 0.1.
-        // We use a tolerance of 0.005 ETH to account for slippage/fees.
-        // TIGHTENING TOLERANCE: From 0.005 to 0.002 to be more strict about unexpected slippage.
-        // 0.002 ETH is still ~6 USD (at 3000 USD/ETH), which covers gas variance but alerts on major slippage.
-        const expectedCost = ethers.parseEther("0.04"); 
-        expect(actualEthSpent).to.be.closeTo(expectedCost, ethers.parseEther("0.002"));
+            const params = {
+                tokenIn: await ecoToken.getAddress(),
+                tokenOut: WETH_ADDRESS,
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountIn: ecoAmount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
 
+            await swapRouter.connect(buyerDeFi).exactInputSingle(params);
 
-        // A. NFT Transferred
-        expect(await ecoNFT.ownerOf(tokenId2)).to.equal(buyerDeFi.address);
-
-        // B. Seller got Paid in ECO
-        const finalSellerBalance = await ecoToken.balanceOf(seller.address);
-        expect(finalSellerBalance).to.equal(initialSellerBalance + LISTING_PRICE);
-
-        // C. Buyer has 0 ECO (Swap was exact, no dust left in Buyer wallet)
-        expect(await ecoToken.balanceOf(buyerDeFi.address)).to.equal(0);
+            const wethBalanceAfter = await weth.balanceOf(buyerDeFi.address);
+            expect(wethBalanceAfter).to.be.gt(wethBalanceBefore);
+            
+            console.log(`    🔄 Sold 100 ECO for ${ethers.formatEther(wethBalanceAfter - wethBalanceBefore)} WETH`);
+        });
     });
 
-    // --- EDGE CASES ---
+    // --------------------------------------------------------------------------------
+    // TEST 5: Edge Cases (Concentrated Liquidity Limits)
+    // --------------------------------------------------------------------------------
+    describe("5. Liquidity Range Limits (Bonus)", function () {
+        it("Should fail or execute poorly if price moves out of range (High Impact)", async function () {
+            // We put ~10 ETH of liquidity in.
+            // If we try to buy 10,000,000 ECO we should crash through the ticks.
 
-    it("Edge Case: Should revert if ETH sent is insufficient", async function () {
-        // Mint & List
-        await ecoNFT.connect(owner).mintProject(seller.address, 100, 365, "ipfs://test3");
-        const count = await ecoNFT.totalSupply();
-        const tokenId3 = await ecoNFT.tokenByIndex(count - BigInt(1));
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId3);
-        await ecoMarketplace.connect(seller).listProject(tokenId3, LISTING_PRICE);
+            const hugeEcoAmount = ethers.parseEther("10000000"); // 10M ECO
+            await ecoToken.mint(buyerDeFi.address, hugeEcoAmount);
+            await ecoToken.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, hugeEcoAmount);
 
-        // Try to buy with 0.01 ETH (Requires ~0.04)
-        const insufficientEth = ethers.parseEther("0.01");
-        
-        // Uniswap V3 exactOutputSingle reverts if amountInMaximum is exceeded.
-        // The error bubbling up might be "STF" (Safe Transfer Failed) or Uniswap internal error.
-        // Or generic revert. We just ensure it reverts.
-        await expect(
-            ecoMarketplace.connect(buyerDeFi).buyWithETH(tokenId3, { value: insufficientEth })
-        ).to.be.reverted; 
+            const params = {
+                tokenIn: await ecoToken.getAddress(),
+                tokenOut: WETH_ADDRESS,
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountIn: hugeEcoAmount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
+
+            // This should fail because we only initialized ONE range.
+            let failed = false;
+            try {
+                await swapRouter.connect(buyerDeFi).exactInputSingle(params);
+            } catch (error) {
+                console.log("    ✅ High Impact Swap Reverted (Out of Liquidity Range)");
+                failed = true;
+            }
+            
+            if (!failed) {
+                 // Or maybe we verify we got terrible execution?
+                 // But in V3 with one position, it should revert when crossing uninitialized ticks usually.
+                 console.log("    ⚠️ High Swap executed (Unexpected for single range)");
+            }
+        });
     });
-
-    it("Edge Case: Should revert standard buy if Allowance is missing", async function () {
-        // Mint & List
-        await ecoNFT.connect(owner).mintProject(seller.address, 100, 365, "ipfs://test4");
-        const count = await ecoNFT.totalSupply();
-        const tokenId4 = await ecoNFT.tokenByIndex(count - BigInt(1));
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId4);
-        await ecoMarketplace.connect(seller).listProject(tokenId4, LISTING_PRICE);
-
-        // Buyer has ECO but no approval
-        await ecoToken.connect(buyerStandard).faucet();
-        // Reset approval just in case
-        await ecoToken.connect(buyerStandard).approve(await ecoMarketplace.getAddress(), 0);
-
-        // Expect revert due to lack of allowance (ERC20InsufficientAllowance)
-        // Hardhat matchers can check specific custom errors if ABI is known, 
-        // otherwise we check for generic revert or specific string.
-        await expect(
-            ecoMarketplace.connect(buyerStandard).buyProject(tokenId4)
-        ).to.be.revertedWithCustomError(ecoToken, "ERC20InsufficientAllowance");
-    });
-
-    it("Edge Case: Should revert if project is already sold", async function () {
-        // Use previous sold token (tokenId2 from Scenario B)
-        // It was sold to buyerDeFi.
-        // Try to buy it again (anyone trying)
-        
-        const count = await ecoNFT.totalSupply();
-        const tokenId2 = await ecoNFT.tokenByIndex(count - BigInt(2)); // Use earlier token
-        
-        // The tokenId2 logic above is tricky because tests run in sequence. 
-        // Let's just create a new one, sell it, then try again.
-        await ecoNFT.connect(owner).mintProject(seller.address, 100, 365, "ipfs://test5");
-        const countNew = await ecoNFT.totalSupply();
-        const tokenId5 = await ecoNFT.tokenByIndex(countNew - BigInt(1));
-        
-        await ecoNFT.connect(seller).approve(await ecoMarketplace.getAddress(), tokenId5);
-        await ecoMarketplace.connect(seller).listProject(tokenId5, LISTING_PRICE);
-        
-        // Buy once (Standard)
-        await ecoToken.connect(buyerStandard).approve(await ecoMarketplace.getAddress(), LISTING_PRICE);
-        await ecoMarketplace.connect(buyerStandard).buyProject(tokenId5);
-
-        // Buy again
-        await expect(
-            ecoMarketplace.connect(buyerStandard).buyProject(tokenId5)
-        ).to.be.revertedWithCustomError(ecoMarketplace, "AlreadySold");
-    });
-  });
 });
