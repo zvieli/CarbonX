@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { uploadToIPFS, testConnection } from '../services/pinata';
 import { ethers } from 'ethers';
+import { useNavigate } from 'react-router-dom';
 import './AdminMint.css';
 import './AdminMintStatus.css';
 
 const AdminMint = () => {
     const { contracts, isOwner, loading } = useWeb3();
+    const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -124,6 +126,10 @@ const AdminMint = () => {
             await txList.wait();
 
             setStatus("Project Successfully Launched!");
+            // Redirect to Dashboard
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 2000);
             setProgressStep(4); // Done
             
         } catch (error) {

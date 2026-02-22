@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
 import { getGatewayUrl } from '../services/pinata';
@@ -8,6 +8,7 @@ import './ProjectDetails.css';
 
 const ProjectDetails = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const { contracts, isOwner, account } = useWeb3();
     const [project, setProject] = useState(null);
     const [listing, setListing] = useState(null); // Stores listing info
@@ -93,7 +94,7 @@ const ProjectDetails = () => {
 
             setStatus("Project Listed Successfully!");
             setShowListingInput(false);
-            loadProjectDetails(); // Refresh
+            setTimeout(() => navigate('/dashboard'), 2000);
         } catch (error) {
             console.error(error);
             setStatus("Listing failed: " + (error.reason || error.message));
@@ -107,7 +108,7 @@ const ProjectDetails = () => {
             const tx = await contracts.ecoNFT.retire(id);
             await tx.wait();
             setStatus("Token Retired Successfully!");
-            loadProjectDetails();
+            setTimeout(() => navigate('/dashboard'), 2000);
         } catch (error) {
             console.error(error);
             setStatus("Error retiring token.");
@@ -129,12 +130,12 @@ const ProjectDetails = () => {
                 await txApprove.wait();
             }
 
-            setStatus("Buying with EcoToken...");
-            const txBuy = await contracts.ecoMarketplace.buyProject(id);
+            setStatus("Buy with EcoToken...");
+            const txBuy = await contracts.ecoMarketplace.buyProject(id, { gasLimit: 3000000 });
             await txBuy.wait();
             
             setStatus("Purchase Successful!");
-            loadProjectDetails();
+            setTimeout(() => navigate('/dashboard'), 2000);
         } catch (error) {
             console.error("Buy ECO failed:", error);
             setStatus("Purchase failed: " + (error.reason || error.message));
@@ -165,11 +166,14 @@ const ProjectDetails = () => {
             setStatus(`Buying with ETH (DeFi Swap)... Sending ~${ethWithSlippage.toFixed(5)} ETH`);
             
             const valueToSend = ethers.parseEther(ethWithSlippage.toFixed(18));
-            const txBuy = await contracts.ecoMarketplace.buyWithETH(id, { value: valueToSend });
+            const txBuy = await contracts.ecoMarketplace.buyWithETH(id, { 
+                value: valueToSend,
+                gasLimit: 3000000 
+            });
             await txBuy.wait();
 
             setStatus("Purchase Successful! (Excess ETH Refunded)");
-            loadProjectDetails();
+            setTimeout(() => navigate('/dashboard'), 2000);
         } catch (error) {
             console.error("Buy ETH failed:", error);
             setStatus("DeFi Purchase failed: " + (error.reason || error.message));

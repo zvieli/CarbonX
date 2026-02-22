@@ -42,6 +42,13 @@ async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("🚀 Deploying specific DeFi environment with account:", deployer.address);
 
+    // Dummy transaction to change nonce and generate fresh addresses
+    console.log("🔄 Sending dummy transaction to reset nonce...");
+    await deployer.sendTransaction({
+        to: deployer.address,
+        value: ethers.parseEther("0.1")
+    });
+
     const contractsDir = path.join(__dirname, "..", "frontend", "contracts");
     
     // Clean directory contents if it exists, otherwise create it
@@ -87,6 +94,11 @@ async function main() {
     await ecoToken.waitForDeployment();
     const ecoTokenAddress = await ecoToken.getAddress();
     console.log("✅ EcoToken deployed to:", ecoTokenAddress);
+
+    // Initial Mint for Liquidity (Admin Diet Plan)
+    console.log("🌱 Minting initial 250,000 ECO for liquidity...");
+    await (await ecoToken.mint(deployer.address, ethers.parseEther('250000'))).wait();
+    console.log("✅ Minted.");
 
     // 3. Create Uniswap V3 Pool (WETH / EcoToken) - Concentrated Liquidity
     console.log("🌊 Creating Concentrated Liquidity Pool...");

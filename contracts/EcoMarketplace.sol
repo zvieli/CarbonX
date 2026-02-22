@@ -13,6 +13,10 @@ interface IWETH is IERC20 {
     function withdraw(uint256) external;
 }
 
+interface IEcoNFT {
+    function projects(uint256 tokenId) external view returns (uint128, uint64, uint64, bool, address);
+}
+
 contract EcoMarketplace is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -44,6 +48,10 @@ contract EcoMarketplace is ReentrancyGuard {
     }
 
     function listProject(uint256 tokenId, uint256 price) external {
+        // Prevent listing of retired NFTs
+        (,,, bool isRetired,) = IEcoNFT(address(nftContract)).projects(tokenId);
+        require(!isRetired, "Cannot list retired NFT");
+        
         listings[tokenId] = Listing({
             tokenId: tokenId,
             seller: msg.sender,

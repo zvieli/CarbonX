@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Web3Provider } from './context/Web3Context';
 import Navbar from './components/Navbar';
+import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
 import AdminMint from './pages/AdminMint';
 import ProjectDetails from './pages/ProjectDetails';
@@ -14,7 +15,8 @@ function App() {
           <Navbar />
           <main>
             <Routes>
-              <Route path="/" element={<Marketplace />} />
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/exchange" element={<Exchange />} />
               <Route path="/admin" element={<AdminMint />} />
               <Route path="/project/:id" element={<ProjectDetails />} />

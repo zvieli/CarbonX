@@ -211,7 +211,7 @@ const Exchange = () => {
                     sqrtPriceLimitX96: 0
                 };
                 
-                const tx = await router.exactInputSingle(params, { value: amountInWei });
+                const tx = await router.exactInputSingle(params, { value: amountInWei, gasLimit: 3000000 });
                 setStatus("Transaction sent! Waiting...");
                 await tx.wait();
 
@@ -231,7 +231,7 @@ const Exchange = () => {
                 };
                 
                 // No value sent, just standard ERC20 swap
-                const tx = await router.exactInputSingle(params);
+                const tx = await router.exactInputSingle(params, { gasLimit: 3000000 });
                 setStatus("Transaction sent! Waiting...");
                 await tx.wait();
             }
@@ -239,7 +239,7 @@ const Exchange = () => {
             setStatus("Swap Successful! 🌿");
             setInputAmount('');
             setOutputAmount('');
-            setTimeout(() => setStatus(''), 5000);
+            setTimeout(() => window.location.reload(), 2000);
             
         } catch (error) {
             console.error(error);

@@ -22,6 +22,10 @@ const Navbar = () => {
 
                 <div className="navbar-menu">
                     <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>
+                        Dashboard
+                    </Link>
+
+                    <Link to="/marketplace" className={`nav-link ${location.pathname === '/marketplace' ? 'active' : ''}`}>
                         Marketplace
                     </Link>
 

@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract EcoToken is ERC20, Ownable {
     constructor() ERC20("EcoToken", "ECO") Ownable(msg.sender) {
-        // Mint initial supply to the deployer (Owner)
-        _mint(msg.sender, 100000000 * 10 ** decimals());
+        // Initial supply is 0. 
+        // Admin must mint manually for liquidity.
     }
 
     // Allow owner to mint more tokens (Liquidity management)
