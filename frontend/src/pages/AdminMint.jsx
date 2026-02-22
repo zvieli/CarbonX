@@ -125,10 +125,10 @@ const AdminMint = () => {
             const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
             await txList.wait();
 
-            setStatus("Project Successfully Launched!");
+            setStatus("Project Successfully Launched! Redirecting...");
             // Redirect to Dashboard
             setTimeout(() => {
-                navigate('/dashboard');
+                navigate('/');
             }, 2000);
             setProgressStep(4); // Done
             

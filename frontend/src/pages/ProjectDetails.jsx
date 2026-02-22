@@ -94,7 +94,7 @@ const ProjectDetails = () => {
 
             setStatus("Project Listed Successfully!");
             setShowListingInput(false);
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setTimeout(() => navigate('/'), 2000);
         } catch (error) {
             console.error(error);
             setStatus("Listing failed: " + (error.reason || error.message));
@@ -108,7 +108,7 @@ const ProjectDetails = () => {
             const tx = await contracts.ecoNFT.retire(id);
             await tx.wait();
             setStatus("Token Retired Successfully!");
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setTimeout(() => navigate('/'), 2000);
         } catch (error) {
             console.error(error);
             setStatus("Error retiring token.");
@@ -135,7 +135,7 @@ const ProjectDetails = () => {
             await txBuy.wait();
             
             setStatus("Purchase Successful!");
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setTimeout(() => navigate('/'), 2000);
         } catch (error) {
             console.error("Buy ECO failed:", error);
             setStatus("Purchase failed: " + (error.reason || error.message));
@@ -173,7 +173,7 @@ const ProjectDetails = () => {
             await txBuy.wait();
 
             setStatus("Purchase Successful! (Excess ETH Refunded)");
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setTimeout(() => navigate('/'), 2000);
         } catch (error) {
             console.error("Buy ETH failed:", error);
             setStatus("DeFi Purchase failed: " + (error.reason || error.message));
