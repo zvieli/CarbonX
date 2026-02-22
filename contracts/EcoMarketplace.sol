@@ -87,7 +87,7 @@ contract EcoMarketplace is ReentrancyGuard {
                 tokenOut: address(ecoToken),
                 fee: 3000,
                 recipient: address(this),
-                deadline: block.timestamp,
+                deadline: block.timestamp + 60,
                 amountOut: listing.price,
                 amountInMaximum: msg.value,
                 sqrtPriceLimitX96: 0

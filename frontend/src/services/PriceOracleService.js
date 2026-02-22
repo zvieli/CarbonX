@@ -3,6 +3,7 @@ import ContractAddresses from "../../contracts/contract-addresses.json";
 
 // Constants (Mainnet Fork)
 const UNISWAP_V3_FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+const QUOTER_V2_ADDRESS = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e";
 const CHAINLINK_ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419";
 const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const ECO_TOKEN_ADDRESS = ContractAddresses.EcoToken;
@@ -11,6 +12,10 @@ const POOL_FEE = 3000; // 0.3%
 // Minimal ABIs
 const FACTORY_ABI = [
   "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)"
+];
+
+const QUOTER_V2_ABI = [
+  "function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)"
 ];
 
 const POOL_ABI = [
@@ -45,7 +50,7 @@ export const getPrices = async () => {
             
             if (poolAddress === ethers.ZeroAddress) {
                 console.warn("Pool not found");
-                return { ecoEth: "0", ethUsd: "0" };
+                return { ecoEth: "0", ethUsd: "0", rawPrice: 0 };
             }
             cachedPoolAddress = poolAddress;
         }
@@ -101,11 +106,35 @@ export const getPrices = async () => {
         return {
             ecoEth: ecoPerEth.toFixed(2),
             ethUsd: ethUsd.toFixed(2),
-            rawPrice: priceNum
+            rawPrice: ecoPerEth // Use ecoPerEth as rawPrice for easier calculations
         };
 
     } catch (error) {
         console.error("Oracle Error:", error);
-        return { ecoEth: "2500.00", ethUsd: "3000.00" }; // Fallback
+        return { ecoEth: "2500.00", ethUsd: "3000.00", rawPrice: 2500 }; // Fallback
+    }
+};
+
+export const getQuote = async (amountIn, isEthToEco) => {
+    if (!provider) initProvider();
+    try {
+        const quoter = new ethers.Contract(QUOTER_V2_ADDRESS, QUOTER_V2_ABI, provider);
+        const tokenIn = isEthToEco ? WETH_ADDRESS : ECO_TOKEN_ADDRESS;
+        const tokenOut = isEthToEco ? ECO_TOKEN_ADDRESS : WETH_ADDRESS;
+        
+        const params = {
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: ethers.parseEther(amountIn.toString()),
+            fee: POOL_FEE,
+            sqrtPriceLimitX96: 0
+        };
+
+        // Use staticCall to simulate the transaction and get the return value
+        const result = await quoter.quoteExactInputSingle.staticCall(params);
+        return ethers.formatEther(result.amountOut);
+    } catch (error) {
+        console.error("Quoter Error:", error);
+        return null;
     }
 };

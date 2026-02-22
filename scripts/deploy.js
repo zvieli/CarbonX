@@ -14,10 +14,28 @@ const ARTIFACTS = {
   WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
 };
 
-const encodePriceSqrt = (reserve1, reserve0) => {
-  return BigInt(
-    Math.floor(Math.sqrt(Number(reserve1) / Number(reserve0)) * 2 ** 96)
-  ).toString();
+// Integer square-root (BigInt) using Newton's method
+const integerSqrt = (value) => {
+    if (value < 0n) throw new Error('sqrt only works on non-negative integers');
+    if (value < 2n) return value;
+    let x0 = value;
+    let x1 = (value >> 1n) + 1n;
+    while (x1 < x0) {
+        x0 = x1;
+        x1 = (value / x1 + x1) >> 1n;
+    }
+    return x0;
+};
+
+// BigInt-safe encode sqrt price: sqrt(reserve1/reserve0) * 2^96
+// We compute sqrt( reserve1 * 2^192 / reserve0 ) to avoid floating point.
+const encodePriceSqrtBigInt = (reserve1, reserve0) => {
+    const r1 = BigInt(reserve1);
+    const r0 = BigInt(reserve0);
+    const Q192 = 2n ** 192n;
+    const value = (r1 * Q192) / r0; // scaled by 2^192
+    const sqrt = integerSqrt(value);
+    return sqrt.toString();
 };
 
 async function main() {
@@ -25,17 +43,26 @@ async function main() {
     console.log("🚀 Deploying specific DeFi environment with account:", deployer.address);
 
     const contractsDir = path.join(__dirname, "..", "frontend", "contracts");
-    if (!fs.existsSync(contractsDir)) {
+    
+    // Clean directory contents if it exists, otherwise create it
+    if (fs.existsSync(contractsDir)) {
+        const files = fs.readdirSync(contractsDir);
+        for (const file of files) {
+            fs.unlinkSync(path.join(contractsDir, file));
+        }
+        console.log(`🧹 Cleared old artifacts from ${contractsDir}`);
+    } else {
         fs.mkdirSync(contractsDir, { recursive: true });
     }
 
     const saveFrontendFiles = async (addresses) => {
+        // Save Addresses
         fs.writeFileSync(
             path.join(contractsDir, "contract-addresses.json"),
             JSON.stringify(addresses, null, 2)
         );
 
-        // Save ABIs
+        // Save ABIs - Physically copying the artifact content
         const contractNames = ["EcoNFT", "EcoToken", "EcoMarketplace"];
         for (const name of contractNames) {
             const artifact = await hre.artifacts.readArtifact(name);
@@ -78,40 +105,60 @@ async function main() {
     // If token0 is ECO, price is ~1/2500 WETH per ECO (Price = token1/token0 = WETH/ECO)
     
     if (token0 === ARTIFACTS.WETH) {
-        // Price = 2500
-        // sqrtPrice = 50
-        // sqrtPriceX96 = 50 * 2^96
+        // Price = 2500 ECO per ETH -> numerator/denominator = 2500/1
         console.log("🔹 Token0 is WETH (Price ~ 2500 ECO/ETH)");
-        sqrtPriceX96 = BigInt(50) * (2n ** 96n);
-        tickLower = 76200;
-        tickUpper = 80100;
+        sqrtPriceX96 = encodePriceSqrtBigInt(2500n, 1n);
+        tickLower = 69060;
+        tickUpper = 85200;
     } else {
-        // Price = 1/2500
-        // sqrtPrice = 1/50 = 0.02
-        // sqrtPriceX96 = 0.02 * 2^96 = 2^96 / 50
+        // Price = 1/2500 ETH per ECO -> numerator/denominator = 1/2500
         console.log("🔹 Token0 is ECO (Price ~ 0.0004 ETH/ECO)");
-        sqrtPriceX96 = (2n ** 96n) / 50n;
-        tickLower = -80100;
-        tickUpper = -76200;
+        sqrtPriceX96 = encodePriceSqrtBigInt(1n, 2500n);
+        tickLower = -85200;
+        tickUpper = -69060;
     }
 
     const nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", ARTIFACTS.NonfungiblePositionManager);
     
-    // Initialize Pool
-    console.log("Initializing pool with SqrtPriceX96:", sqrtPriceX96.toString());
-    await nftPositionManager.createAndInitializePoolIfNecessary(
-      token0,
-      token1,
-      fee,
-      sqrtPriceX96
-    );
-    console.log("✅ Pool Created & Initialized");
+        // Initialize Pool
+        console.log("Initializing pool with SqrtPriceX96:", sqrtPriceX96.toString());
+        await nftPositionManager.createAndInitializePoolIfNecessary(
+            token0,
+            token1,
+            fee,
+            sqrtPriceX96
+        );
+        console.log("✅ Pool Created & Initialized");
+
+        // Verify pool slot0.sqrtPriceX96 matches expected value (sanity check)
+        try {
+            const factory = await ethers.getContractAt("IUniswapV3Factory", ARTIFACTS.UniswapV3Factory);
+            const poolAddress = await factory.getPool(token0, token1, fee);
+            if (poolAddress === ethers.ZeroAddress || poolAddress === "0x0000000000000000000000000000000000000000") {
+                console.warn("⚠️ Pool address not found from factory — skipping slot0 verification");
+            } else {
+                const pool = await ethers.getContractAt("IUniswapV3Pool", poolAddress);
+                const slot0 = await pool.slot0();
+                const deployedSqrt = BigInt(slot0.sqrtPriceX96.toString());
+                const expected = BigInt(sqrtPriceX96.toString());
+                const diff = deployedSqrt > expected ? deployedSqrt - expected : expected - deployedSqrt;
+                const tolerance = expected / 100n; // 1% tolerance
+                console.log("Pool slot0.sqrtPriceX96:", deployedSqrt.toString());
+                if (diff <= tolerance) {
+                    console.log("✅ slot0.sqrtPriceX96 within 1% of expected value");
+                } else {
+                    console.warn("⚠️ slot0.sqrtPriceX96 differs from expected by more than 1%", { expected: expected.toString(), deployed: deployedSqrt.toString(), diff: diff.toString() });
+                }
+            }
+        } catch (verifyErr) {
+            console.warn("⚠️ Could not verify pool slot0:", verifyErr.message || verifyErr);
+        }
 
     // 4. Add Concentrated Liquidity
     console.log("💧 Adding Concentrated Liquidity...");
     
-    const amountEco = ethers.parseEther("25000"); // 25k ECO
-    const amountEth = ethers.parseEther("10");    // 10 ETH
+    const amountEco = ethers.parseEther("250000"); // 250k ECO
+    const amountEth = ethers.parseEther("100");    // 100 ETH
 
     // Approve Position Manager to spend ECO
     await ecoToken.approve(ARTIFACTS.NonfungiblePositionManager, ethers.MaxUint256);

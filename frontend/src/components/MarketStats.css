@@ -1,7 +1,6 @@
 .market-stats-container {
     display: flex;
-    justify-content: space-around;
-    align-items: center;
+    flex-direction: column;
     padding: 1rem 2rem;
     margin-bottom: 2rem;
     background: rgba(16, 185, 129, 0.1);
@@ -9,6 +8,49 @@
     border-radius: 12px;
     backdrop-filter: blur(10px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+}
+
+.pool-health-meter {
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.health-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.health-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.health-bar-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 0.5s ease-out;
+}
+
+.health-marker {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: #fff;
+    box-shadow: 0 0 4px rgba(255,255,255,0.8);
 }
 
 .stats-item {

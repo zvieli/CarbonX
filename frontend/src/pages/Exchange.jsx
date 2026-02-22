@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '../context/Web3Context';
-import { getPrices } from '../services/PriceOracleService';
+import { getPrices, getQuote } from '../services/PriceOracleService';
 import './Exchange.css';
 
 // Uniswap V3 SwapRouter on Mainnet
@@ -18,6 +18,7 @@ const Exchange = () => {
     const [needsApproval, setNeedsApproval] = useState(false);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
+    const [priceImpact, setPriceImpact] = useState({ percent: 0, color: 'var(--success)' });
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -91,38 +92,62 @@ const Exchange = () => {
 
     // Auto-calculate output when input changes
     useEffect(() => {
-        if (!inputAmount || isNaN(inputAmount)) {
-            setOutputAmount('');
-            return;
-        }
-        
-        const inVal = parseFloat(inputAmount);
-        if (inVal <= 0) {
-            setOutputAmount('');
-            return;
-        }
+        const calculateQuote = async () => {
+            if (!inputAmount || isNaN(inputAmount) || parseFloat(inputAmount) <= 0) {
+                setOutputAmount('');
+                setPriceImpact({ percent: 0, color: 'var(--success)' });
+                return;
+            }
 
-        const rate = parseFloat(stats.ecoEth); 
-        // rate is ECO per ETH (e.g., 2500)
-        
-        let estimatedOut = 0;
+            const inVal = parseFloat(inputAmount);
+            const spotPrice = parseFloat(stats.ecoEth); // ECO per ETH (e.g. 2500)
 
-        if (isEthToEco) {
-            // Input: ETH, Output: ECO
-            // Output = Input * Rate
-            estimatedOut = inVal * rate;
-        } else {
-            // Input: ECO, Output: ETH
-            // Output = Input / Rate
-            if (rate > 0) estimatedOut = inVal / rate;
-        }
-        
-        // Subtract 0.3% LP Fee estimate
-        const afterFee = estimatedOut * 0.997; 
-        
-        // Format based on token
-        // If getting ECO (isEthToEco), show 2 decimals. If getting ETH, show 6.
-        setOutputAmount(isEthToEco ? afterFee.toFixed(2) : afterFee.toFixed(6));
+            // Get exact quote including impact
+            const quoteOut = await getQuote(inVal, isEthToEco);
+            
+            if (quoteOut) {
+                const outVal = parseFloat(quoteOut);
+                
+                // Calculate Impact
+                // Execution Price = Output / Input
+                // If ETH -> ECO: ExPrice (ECO/ETH) = outVal / inVal. Ideal = spotPrice.
+                // If ECO -> ETH: ExPrice (ETH/ECO) = outVal / inVal. Ideal = 1/spotPrice.
+                
+                let executionPrice = 0;
+                let idealPrice = 0;
+                let impact = 0;
+
+                if (isEthToEco) {
+                    executionPrice = outVal / inVal;
+                    idealPrice = spotPrice;
+                    // Impact = (Ideal - Execution) / Ideal
+                    if (idealPrice > 0) impact = ((idealPrice - executionPrice) / idealPrice) * 100;
+                } else {
+                    // Start w/ spotPrice (ECO/ETH). Ideal Price (ETH/ECO) = 1/spotPrice
+                    executionPrice = outVal / inVal; 
+                    idealPrice = spotPrice > 0 ? 1 / spotPrice : 0;
+                    if (idealPrice > 0) impact = ((idealPrice - executionPrice) / idealPrice) * 100;
+                }
+                
+                // Set Color
+                let color = 'var(--success)'; // Green
+                if (impact > 1 && impact <= 3) color = '#f39c12'; // Yellow
+                if (impact > 3) color = '#e74c3c'; // Red
+
+                setPriceImpact({ percent: impact.toFixed(2), color });
+                setOutputAmount(isEthToEco ? outVal.toFixed(2) : outVal.toFixed(6));
+            } else {
+                 // Fallback to estimation if quote fails
+                 const rate = spotPrice;
+                 let estimatedOut = isEthToEco ? inVal * rate : (rate > 0 ? inVal / rate : 0);
+                 const afterFee = estimatedOut * 0.997; 
+                 setOutputAmount(isEthToEco ? afterFee.toFixed(2) : afterFee.toFixed(6));
+            }
+        };
+
+        const timer = setTimeout(calculateQuote, 500); // 500ms Debounce
+        return () => clearTimeout(timer);
+
     }, [inputAmount, stats.ecoEth, isEthToEco]);
 
     const handleApprove = async () => {
@@ -297,6 +322,18 @@ const Exchange = () => {
                             <span>Rate</span>
                             <span>1 ETH ≈ {stats.ecoEth} ECO</span>
                         </div>
+                        {parseFloat(inputAmount) > 0 && (
+                            <div className="rate-row" style={{marginTop: '0.5rem', color: priceImpact.color}}>
+                                <span>Price Impact</span>
+                                <span>
+                                    {priceImpact.percent}% 
+                                    <span style={{fontSize:'0.8em', marginLeft:'5px'}}>
+                                        ({parseFloat(priceImpact.percent) < 1 ? 'Optimal' : 
+                                          parseFloat(priceImpact.percent) < 3 ? 'Warning' : 'High Slippage'})
+                                    </span>
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {!account ? (

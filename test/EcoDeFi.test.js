@@ -304,14 +304,87 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
     });
 
     // --------------------------------------------------------------------------------
-    // TEST 5: Edge Cases (Concentrated Liquidity Limits)
+    // TEST 5: Liquidity Stress Tests
     // --------------------------------------------------------------------------------
-    describe("5. Liquidity Range Limits (Bonus)", function () {
-        it("Should fail or execute poorly if price moves out of range (High Impact)", async function () {
-            // We put ~10 ETH of liquidity in.
-            // If we try to buy 10,000,000 ECO we should crash through the ticks.
+    describe("5. Liquidity Stress Tests", function () {
+        it("Stability: Should handle 5,000 ECO purchase with < 2% price impact", async function () {
+            // We want to buy exactly 5000 ECO. We'll use exactOutputSingle.
+            const ecoAmountOut = ethers.parseEther("5000");
+            const maxEthIn = ethers.parseEther("5"); // ~2 ETH expected, 5 is safe max
+            
+            await weth.connect(buyerDeFi).deposit({ value: maxEthIn });
+            await weth.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, maxEthIn);
 
-            const hugeEcoAmount = ethers.parseEther("10000000"); // 10M ECO
+            const slot0Before = await uniswapV3Pool.slot0();
+            const sqrtPriceBefore = BigInt(slot0Before.sqrtPriceX96.toString());
+
+            const params = {
+                tokenIn: WETH_ADDRESS,
+                tokenOut: await ecoToken.getAddress(),
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountOut: ecoAmountOut,
+                amountInMaximum: maxEthIn,
+                sqrtPriceLimitX96: 0
+            };
+
+            await swapRouter.connect(buyerDeFi).exactOutputSingle(params);
+
+            const slot0After = await uniswapV3Pool.slot0();
+            const sqrtPriceAfter = BigInt(slot0After.sqrtPriceX96.toString());
+
+            // Calculate Price Impact %
+            // Impact = |after - before| * 10000 / before (for 2 decimal precision, e.g., 200 = 2.00%)
+            const diff = sqrtPriceAfter > sqrtPriceBefore ? sqrtPriceAfter - sqrtPriceBefore : sqrtPriceBefore - sqrtPriceAfter;
+            const impactBasisPoints = (diff * 10000n) / sqrtPriceBefore;
+            const impactPercent = Number(impactBasisPoints) / 100;
+
+            console.log(`    📊 Stability Test: Bought 5,000 ECO`);
+            console.log(`    📉 Price Impact: ${impactPercent}%`);
+            console.log(`    📍 Tick moved from ${slot0Before.tick} to ${slot0After.tick}`);
+
+            expect(impactPercent).to.be.lt(2); // Less than 2%
+        });
+
+        it("Lower Limit: Should handle 50 ETH buy without crossing lower boundary", async function () {
+            const ethAmountIn = ethers.parseEther("50");
+            
+            await weth.connect(buyerDeFi).deposit({ value: ethAmountIn });
+            await weth.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, ethAmountIn);
+
+            const params = {
+                tokenIn: WETH_ADDRESS,
+                tokenOut: await ecoToken.getAddress(),
+                fee: FEE_TIER,
+                recipient: buyerDeFi.address,
+                deadline: Math.floor(Date.now() / 1000) + 60,
+                amountIn: ethAmountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
+
+            await swapRouter.connect(buyerDeFi).exactInputSingle(params);
+
+            const slot0After = await uniswapV3Pool.slot0();
+            
+            console.log(`    🐋 Whale Buy: 50 ETH dumped into pool`);
+            console.log(`    📍 Final Tick: ${slot0After.tick}`);
+
+            // If token0 is WETH, buying ECO means we are swapping WETH (token0) for ECO (token1).
+            // This pushes the price of token1 UP relative to token0, meaning the tick goes UP.
+            // If token0 is ECO, swapping WETH (token1) for ECO (token0) pushes the price of token0 UP, meaning tick goes DOWN.
+            // We just need to ensure it didn't cross the boundary where liquidity ends.
+            const isWethToken0 = token0 === WETH_ADDRESS;
+            if (isWethToken0) {
+                expect(slot0After.tick).to.be.lt(85200); // Upper boundary for WETH=token0
+            } else {
+                expect(slot0After.tick).to.be.gt(-85200); // Lower boundary for ECO=token0
+            }
+        });
+
+        it("Upper Limit: Should handle 150,000 ECO sell without crossing upper boundary", async function () {
+            const hugeEcoAmount = ethers.parseEther("150000"); // 150k ECO
             await ecoToken.mint(buyerDeFi.address, hugeEcoAmount);
             await ecoToken.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, hugeEcoAmount);
 
@@ -326,19 +399,18 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
                 sqrtPriceLimitX96: 0
             };
 
-            // This should fail because we only initialized ONE range.
-            let failed = false;
-            try {
-                await swapRouter.connect(buyerDeFi).exactInputSingle(params);
-            } catch (error) {
-                console.log("    ✅ High Impact Swap Reverted (Out of Liquidity Range)");
-                failed = true;
-            }
+            await swapRouter.connect(buyerDeFi).exactInputSingle(params);
+
+            const slot0After = await uniswapV3Pool.slot0();
             
-            if (!failed) {
-                 // Or maybe we verify we got terrible execution?
-                 // But in V3 with one position, it should revert when crossing uninitialized ticks usually.
-                 console.log("    ⚠️ High Swap executed (Unexpected for single range)");
+            console.log(`    🐻 Bear Dump: 150,000 ECO sold into pool`);
+            console.log(`    📍 Final Tick: ${slot0After.tick}`);
+
+            const isWethToken0 = token0 === WETH_ADDRESS;
+            if (isWethToken0) {
+                expect(slot0After.tick).to.be.gt(69060); // Lower boundary for WETH=token0
+            } else {
+                expect(slot0After.tick).to.be.lt(-69060); // Upper boundary for ECO=token0
             }
         });
     });
