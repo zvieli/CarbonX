@@ -14,9 +14,4 @@ contract EcoToken is ERC20, Ownable {
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
     }
-
-    // Faucet for testing: Anyone can get 1000 tokens
-    function faucet() external {
-        _mint(msg.sender, 1000 * 10 ** decimals());
-    }
 }

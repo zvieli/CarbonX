@@ -17,22 +17,7 @@ const Dashboard = () => {
         setTimeout(() => setStatus(''), 2000);
     };
 
-    const handleFaucet = async () => {
-        try {
-            setActionLoading(true);
-            setStatus('Requesting 1,000 ECO from Faucet...');
-            const tx = await contracts.ecoToken.faucet();
-            await tx.wait();
-            setStatus('Success! 1,000 ECO received.');
-            refresh();
-            setTimeout(() => window.location.reload(), 2000); // Reload as requested
-        } catch (error) {
-            console.error(error);
-            setStatus('Faucet Failed: ' + (error.reason || error.message));
-        } finally {
-            setActionLoading(false);
-        }
-    };
+    // Faucet removed
 
     const handleRetire = async (id) => {
         if (!window.confirm("Are you sure you want to retire this credit? This action is irreversible.")) return;
@@ -82,9 +67,7 @@ const Dashboard = () => {
                     </div>
                 </div>
                 <div className="header-actions">
-                    <button className="btn-primary faucet-btn" onClick={handleFaucet} disabled={actionLoading}>
-                        <i className="fas fa-faucet"></i> Get 1,000 ECO
-                    </button>
+                    {/* Faucet removed */}
                 </div>
             </div>
 

@@ -15,6 +15,7 @@ const Exchange = () => {
     const [outputAmount, setOutputAmount] = useState('');
     const [isEthToEco, setIsEthToEco] = useState(true);
     const [balances, setBalances] = useState({ eth: '0.0', eco: '0.0' });
+    const [rawBalances, setRawBalances] = useState({ eth: 0n, eco: 0n });
     const [needsApproval, setNeedsApproval] = useState(false);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
@@ -46,11 +47,12 @@ const Exchange = () => {
                 
                 // ECO Balance
                 const ecoBal = await contracts.ecoToken.balanceOf(account);
-                
+
                 setBalances({
                     eth: parseFloat(ethers.formatEther(ethBal)).toFixed(4),
                     eco: parseFloat(ethers.formatEther(ecoBal)).toFixed(2)
                 });
+                setRawBalances({ eth: BigInt(ethBal.toString()), eco: BigInt(ecoBal.toString()) });
             } catch (error) {
                 console.error("Error fetching balances:", error);
             }
@@ -65,29 +67,44 @@ const Exchange = () => {
 
     // Check Allowance (Only when selling ECO)
     useEffect(() => {
+        let isCancelled = false;
+        
         const checkAllowance = async () => {
             // Only need approval if we are converting ECO -> ETH
             if (isEthToEco || !inputAmount || !account || !contracts.ecoToken) {
-                setNeedsApproval(false);
+                if (!isCancelled) setNeedsApproval(false);
                 return;
             }
 
             try {
-                const amountWei = ethers.parseEther(inputAmount);
+                let amountWei = ethers.parseEther(inputAmount);
+                // Cap amount to on-chain ECO balance to avoid STF (Swap Transfer Failed)
+                const ecoBal = rawBalances.eco;
+                if (ecoBal && amountWei > ecoBal) {
+                    amountWei = ecoBal;
+                }
+
                 const allowance = await contracts.ecoToken.allowance(account, SWAP_ROUTER_ADDRESS);
                 
-                if (allowance < amountWei) {
-                    setNeedsApproval(true);
-                } else {
-                    setNeedsApproval(false);
+                if (!isCancelled) {
+                     // Check if allowance is strictly less than amount
+                     if (allowance < amountWei) {
+                        setNeedsApproval(true);
+                    } else {
+                        setNeedsApproval(false);
+                    }
                 }
             } catch (error) {
                 console.error("Error checking allowance:", error);
             }
         };
 
-        const timer = setTimeout(checkAllowance, 500); // Debounce
-        return () => clearTimeout(timer);
+        const timer = setTimeout(checkAllowance, 500); // 500ms Debounce
+        
+        return () => {
+            isCancelled = true;
+            clearTimeout(timer);
+        };
     }, [inputAmount, isEthToEco, account, contracts]);
 
     // Auto-calculate output when input changes
@@ -151,14 +168,12 @@ const Exchange = () => {
     }, [inputAmount, stats.ecoEth, isEthToEco]);
 
     const handleApprove = async () => {
-        if (!inputAmount) return;
         setLoading(true);
-        setStatus("Approving ECO...");
+        setStatus("Approving Max ECO...");
 
         try {
-            const amountWei = ethers.parseEther(inputAmount);
-            // Approve slightly more to be safe or exact amount
-            const tx = await contracts.ecoToken.approve(SWAP_ROUTER_ADDRESS, amountWei);
+            // Professional DeFi Standard: Approve MaxUint256 to save gas and avoid "exact amount" issues
+            const tx = await contracts.ecoToken.approve(SWAP_ROUTER_ADDRESS, ethers.MaxUint256);
             await tx.wait();
             
             setStatus("Approval Successful! You can swap now.");
@@ -193,7 +208,21 @@ const Exchange = () => {
 
             const router = new ethers.Contract(SWAP_ROUTER_ADDRESS, routerAbi, signer);
             const ecoAddress = await contracts.ecoToken.getAddress();
-            const amountInWei = ethers.parseEther(inputAmount);
+            let amountInWei = ethers.parseEther(inputAmount);
+
+            // If selling ECO make sure amountIn <= on-chain ECO balance (use exact balance for "swap all")
+            if (!isEthToEco) {
+                // Fetch FRESH balance directly from chain to avoid stale state issues
+                const freshEcoBal = await contracts.ecoToken.balanceOf(account);
+                console.log(`Swap Check: Input=${amountInWei}, Balance=${freshEcoBal}`);
+
+                if (freshEcoBal && amountInWei > freshEcoBal) {
+                    console.log("Capping amount to balance due to precision/gas cost");
+                    amountInWei = freshEcoBal;
+                    // Update input field to reflect actual amount used
+                    setInputAmount(ethers.formatEther(freshEcoBal));
+                }
+            }
             
             const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20m
 
@@ -341,13 +370,20 @@ const Exchange = () => {
                             Connect Wallet
                         </button>
                     ) : (
-                        <button 
-                            className={`swap-btn ${needsApproval ? 'approve-mode' : 'swap-mode'}`}
-                            onClick={needsApproval ? handleApprove : handleSwap}
-                            disabled={loading || (!needsApproval && (!inputAmount || parseFloat(inputAmount) <= 0))}
-                        >
-                            {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (needsApproval ? `Approve ${isEthToEco ? 'ETH' : 'ECO'}` : "Swap Now")}
-                        </button>
+                        <div className="action-buttons">
+                            {/* If we need approval, show Approve button. Otherwise show Swap. 
+                                Or show both disabled/enabled based on state? 
+                                User requested specific 'Enable ECO' button behavior.
+                                We will stick to the mode-switch button for simplicity but ensure the checks are robust.
+                            */}
+                             <button 
+                                className={`swap-btn ${needsApproval ? 'approve-mode' : 'swap-mode'}`}
+                                onClick={needsApproval ? handleApprove : handleSwap}
+                                disabled={loading || (!needsApproval && (!inputAmount || parseFloat(inputAmount) <= 0))}
+                            >
+                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (needsApproval ? `Enable ECO (Approve)` : "Swap Now")}
+                            </button>
+                        </div>
                     )}
 
                     {status && (

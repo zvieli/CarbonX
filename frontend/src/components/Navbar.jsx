@@ -7,10 +7,7 @@ const Navbar = () => {
     const { account, connectWallet, isOwner } = useWeb3();
     const location = useLocation();
 
-    // Mock Faucet Function
-    const handleFaucet = () => {
-        alert("Faucet: 1000 ECO Tokens requested! (Logic to be implemented)");
-    };
+    // Faucet removed
 
     return (
         <nav className="navbar">
@@ -39,9 +36,7 @@ const Navbar = () => {
                         </Link>
                     )}
 
-                    <button className="btn-outline faucet-btn" onClick={handleFaucet}>
-                        <i className="fas fa-faucet"></i> Get Free ECO
-                    </button>
+                    {/* Faucet removed */}
 
                     {account ? (
                         <div className="wallet-badge">
