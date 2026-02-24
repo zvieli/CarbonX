@@ -40,6 +40,9 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
         const ecoNFTAddress = await ecoNFT.getAddress();
 
         console.log("✅ Tokens Deployed");
+        
+        // Mint Initial Supply (Simulating Deploy Script)
+        await ecoToken.mint(owner.address, ethers.parseEther("250000"));
 
         // 2. Setup Uniswap V3 Pool
         // Sort tokens for Uniswap
@@ -58,7 +61,7 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
             sqrtPriceX96 = (2n ** 96n) / 50n;
         }
 
-        nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", POSITION_MANAGER_ADDRESS);
+        nftPositionManager = await ethers.getContractAt("contracts/INonfungiblePositionManager.sol:INonfungiblePositionManager", POSITION_MANAGER_ADDRESS);
         
         // Initialize Pool
         await nftPositionManager.createAndInitializePoolIfNecessary(
@@ -75,7 +78,7 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
         await ecoToken.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
         
         // Wrap ETH
-        weth = await ethers.getContractAt("contracts/TestInterfaces.sol:IWETH", WETH_ADDRESS);
+        weth = await ethers.getContractAt("contracts/INonfungiblePositionManager.sol:IWETH", WETH_ADDRESS);
         await weth.deposit({ value: amountEth * 2n }); 
         await weth.approve(POSITION_MANAGER_ADDRESS, ethers.MaxUint256);
 
@@ -304,9 +307,11 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
     });
 
     // --------------------------------------------------------------------------------
-    // TEST 5: Liquidity Stress Tests
-    // --------------------------------------------------------------------------------
     describe("5. Liquidity Stress Tests", function () {
+        
+        // Helper to get price from tick
+        const getPriceFromTick = (tick) => Math.pow(1.0001, Number(tick)).toFixed(6);
+
         it("Stability: Should handle 5,000 ECO purchase with < 2% price impact", async function () {
             // We want to buy exactly 5000 ECO. We'll use exactOutputSingle.
             const ecoAmountOut = ethers.parseEther("5000");
@@ -317,6 +322,7 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
 
             const slot0Before = await uniswapV3Pool.slot0();
             const sqrtPriceBefore = BigInt(slot0Before.sqrtPriceX96.toString());
+            const tickBefore = Number(slot0Before.tick);
 
             const params = {
                 tokenIn: WETH_ADDRESS,
@@ -333,6 +339,7 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
 
             const slot0After = await uniswapV3Pool.slot0();
             const sqrtPriceAfter = BigInt(slot0After.sqrtPriceX96.toString());
+            const tickAfter = Number(slot0After.tick);
 
             // Calculate Price Impact %
             // Impact = |after - before| * 10000 / before (for 2 decimal precision, e.g., 200 = 2.00%)
@@ -342,7 +349,8 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
 
             console.log(`    📊 Stability Test: Bought 5,000 ECO`);
             console.log(`    📉 Price Impact: ${impactPercent}%`);
-            console.log(`    📍 Tick moved from ${slot0Before.tick} to ${slot0After.tick}`);
+            console.log(`    📍 Tick moved from ${tickBefore} to ${tickAfter}`);
+            console.log(`    💰 Price moved from ${getPriceFromTick(tickBefore)} to ${getPriceFromTick(tickAfter)} (1.0001^tick)`);
 
             expect(impactPercent).to.be.lt(2); // Less than 2%
         });
@@ -352,6 +360,9 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
             
             await weth.connect(buyerDeFi).deposit({ value: ethAmountIn });
             await weth.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, ethAmountIn);
+
+            const slot0Before = await uniswapV3Pool.slot0();
+            const tickBefore = Number(slot0Before.tick);
 
             const params = {
                 tokenIn: WETH_ADDRESS,
@@ -367,9 +378,11 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
             await swapRouter.connect(buyerDeFi).exactInputSingle(params);
 
             const slot0After = await uniswapV3Pool.slot0();
+            const tickAfter = Number(slot0After.tick);
             
             console.log(`    🐋 Whale Buy: 50 ETH dumped into pool`);
-            console.log(`    📍 Final Tick: ${slot0After.tick}`);
+            console.log(`    📍 Tick moved from ${tickBefore} to ${tickAfter}`);
+            console.log(`    💰 Price moved from ${getPriceFromTick(tickBefore)} to ${getPriceFromTick(tickAfter)} (1.0001^tick)`);
 
             // If token0 is WETH, buying ECO means we are swapping WETH (token0) for ECO (token1).
             // This pushes the price of token1 UP relative to token0, meaning the tick goes UP.
@@ -388,6 +401,9 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
             await ecoToken.mint(buyerDeFi.address, hugeEcoAmount);
             await ecoToken.connect(buyerDeFi).approve(SWAP_ROUTER_ADDRESS, hugeEcoAmount);
 
+            const slot0Before = await uniswapV3Pool.slot0();
+            const tickBefore = Number(slot0Before.tick);
+
             const params = {
                 tokenIn: await ecoToken.getAddress(),
                 tokenOut: WETH_ADDRESS,
@@ -402,9 +418,11 @@ describe("🌿 EcoDeFi Protocol Verification (Mainnet Fork)", function () {
             await swapRouter.connect(buyerDeFi).exactInputSingle(params);
 
             const slot0After = await uniswapV3Pool.slot0();
+            const tickAfter = Number(slot0After.tick);
             
             console.log(`    🐻 Bear Dump: 150,000 ECO sold into pool`);
-            console.log(`    📍 Final Tick: ${slot0After.tick}`);
+            console.log(`    📍 Tick moved from ${tickBefore} to ${tickAfter}`);
+            console.log(`    💰 Price moved from ${getPriceFromTick(tickBefore)} to ${getPriceFromTick(tickAfter)} (1.0001^tick)`);
 
             const isWethToken0 = token0 === WETH_ADDRESS;
             if (isWethToken0) {

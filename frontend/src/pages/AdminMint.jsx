@@ -82,7 +82,7 @@ const AdminMint = () => {
 
             // --- Step 2: Minting ---
             setProgressStep(2);
-            setStatus("Minting NFT on Blockchain...");
+            setStatus("Minting CarbonX Project...");
             
             const adminAddress = await contracts.ecoNFT.runner.getAddress();
             const txMint = await contracts.ecoNFT.mintProject(
@@ -190,7 +190,7 @@ const AdminMint = () => {
                         </div>
 
                         <div className="form-group">
-                            <label>Listing Price (ECO)</label>
+                            <label>Listing Price (CX)</label>
                             <input name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} placeholder="e.g. 500" />
                         </div>
 
@@ -246,7 +246,7 @@ const AdminMint = () => {
                             <div className="card-footer">
                                 <div className="price-tag">
                                     <span className="label">Price</span>
-                                    <span className="value">{formData.price || '0'} ECO</span>
+                                    <span className="value">{formData.price || '0'} CX</span>
                                 </div>
                                 <button className="btn-outline btn-sm">Buy Now</button>
                             </div>

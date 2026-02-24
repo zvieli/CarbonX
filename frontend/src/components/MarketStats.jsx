@@ -57,9 +57,9 @@ const MarketStats = () => {
         <div className="market-stats-container glass-panel">
             <div className="stats-row">
                 <div className={`stats-item ${pulse ? 'pulse-green' : ''}`}>
-                    <span className="stats-label">ECO Price</span>
+                    <span className="stats-label">CX Price</span>
                     <span className="stats-value">
-                       <i className="fab fa-ethereum"></i> 1 ≈ {stats.ecoEth} ECO
+                       <i className="fab fa-ethereum"></i> 1 ≈ {stats.ecoEth} CX
                     </span>
                 </div>
                 <div className="stats-divider"></div>
@@ -74,11 +74,11 @@ const MarketStats = () => {
             {/* Pool Health / Depth Meter */}
             <div className="pool-health-meter">
                  <div className="health-labels">
-                     <span>1,000 ECO</span>
+                     <span>1,000 CX</span>
                      <span className="health-title" style={{color: isDangerZone ? '#e74c3c' : 'var(--text-secondary)'}}>
                         Liquidity Depth {isDangerZone && '⚠️'}
                      </span>
-                     <span>5,000 ECO</span>
+                     <span>5,000 CX</span>
                  </div>
                  <div className="health-bar-bg">
                      <div 

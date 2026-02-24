@@ -79,8 +79,8 @@ const Dashboard = () => {
                 <div className="stat-card">
                     <div className="icon-wrapper eco-bg"><i className="fas fa-coins"></i></div>
                     <div className="stat-content">
-                        <h3>ECO Balance</h3>
-                        <div className="value">{data.ecoBalance} ECO</div>
+                        <h3>CX Balance</h3>
+                        <div className="value">{data.ecoBalance} CX</div>
                         <div className="sub-value">≈ {data.ecoBalanceEth} ETH</div>
                     </div>
                 </div>
@@ -119,7 +119,7 @@ const Dashboard = () => {
                             <div className="asset-image">
                                 {nft.image ? <img src={nft.image} alt={nft.name} /> : <div className="placeholder"></div>}
                                 <span className={`status-badge ${nft.isRetired ? 'retired' : (nft.isListed ? 'listed' : 'active')}`}>
-                                    {nft.isRetired ? 'RETIRED' : (nft.isListed ? `LISTED: ${nft.listingPrice} ECO` : 'ACTIVE')}
+                                    {nft.isRetired ? 'RETIRED' : (nft.isListed ? `LISTED: ${nft.listingPrice} CX` : 'ACTIVE')}
                                 </span>
                             </div>
                             

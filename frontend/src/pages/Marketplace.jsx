@@ -56,7 +56,11 @@ const Marketplace = () => {
                     const gatewayUrl = getGatewayUrl(tokenURI);
                     if (gatewayUrl) {
                       const response = await fetch(gatewayUrl);
-                      metadata = await response.json();
+                      const jsonMeta = await response.json();
+                      if (jsonMeta.image) {
+                           jsonMeta.image = getGatewayUrl(jsonMeta.image);
+                      }
+                      metadata = jsonMeta;
                     }
                 } catch (e) {
                     console.warn("Failed to fetch metadata for", tokenId, e);
@@ -203,7 +207,7 @@ const Marketplace = () => {
                                             <>
                                                 <div className="price-display">
                                                     <span className="price-label">Price</span>
-                                                    <span className="price-amount text-gradient">{project.listing.price} ECO</span>
+                                                    <span className="price-amount text-gradient">{project.listing.price} CX</span>
                                                 </div>
                                                 {ethPreview[project.id] && (
                                                     <div style={{fontSize: '0.75rem', color: '#95a5a6', marginTop: '0.2rem'}}>

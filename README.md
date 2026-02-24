@@ -1,6 +1,6 @@
-# Proof Of Green (POG)
+# CarbonX (CX)
 
-This repository is a small DeFi / carbon‑credit demo combining an ERC20 token (ECO), ERC721 carbon‑credit NFTs, a marketplace and Uniswap V3 liquidity to showcase lifecycle flows for issuing, listing, buying and retiring carbon credits.
+This repository is a small DeFi / carbon‑credit demo combining an ERC20 token (CX), ERC721 carbon‑credit NFTs, a marketplace and Uniswap V3 liquidity to showcase lifecycle flows for issuing, listing, buying and retiring carbon credits.
 
 **Current project status (2026-02-23)**
 

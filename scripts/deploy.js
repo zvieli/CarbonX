@@ -40,7 +40,7 @@ const encodePriceSqrtBigInt = (reserve1, reserve0) => {
 
 async function main() {
     const [deployer] = await ethers.getSigners();
-    console.log("🚀 Deploying specific DeFi environment with account:", deployer.address);
+    console.log("🚀 Deploying CarbonX (CX) environment with account:", deployer.address);
 
     // Dummy transaction to change nonce and generate fresh addresses
     console.log("🔄 Sending dummy transaction to reset nonce...");
@@ -86,21 +86,21 @@ async function main() {
     const ecoNFT = await EcoNFT.deploy();
     await ecoNFT.waitForDeployment();
     const ecoNFTAddress = await ecoNFT.getAddress();
-    console.log("✅ EcoNFT deployed to:", ecoNFTAddress);
+    console.log("✅ CarbonX NFT deployed to:", ecoNFTAddress);
 
     // 2. Deploy EcoToken (ERC20)
     const EcoToken = await ethers.getContractFactory("EcoToken");
     const ecoToken = await EcoToken.deploy();
     await ecoToken.waitForDeployment();
     const ecoTokenAddress = await ecoToken.getAddress();
-    console.log("✅ EcoToken deployed to:", ecoTokenAddress);
+    console.log("✅ CarbonX Token (CX) deployed to:", ecoTokenAddress);
 
-    // Initial Mint for Liquidity (Admin Diet Plan)
-    console.log("🌱 Minting initial 250,000 ECO for liquidity...");
+    // Initial Mint for Liquidity (Admin Allocation)
+    console.log("🌱 Minting initial 250,000 CX for liquidity...");
     await (await ecoToken.mint(deployer.address, ethers.parseEther('250000'))).wait();
     console.log("✅ Minted.");
 
-    // 3. Create Uniswap V3 Pool (WETH / EcoToken) - Concentrated Liquidity
+    // 3. Create Uniswap V3 Pool (WETH / CX) - Concentrated Liquidity
     console.log("🌊 Creating Concentrated Liquidity Pool...");
     
     // Sort tokens strictly by address (Uniswap Requirement)
@@ -118,19 +118,19 @@ async function main() {
     
     if (token0 === ARTIFACTS.WETH) {
         // Price = 2500 ECO per ETH -> numerator/denominator = 2500/1
-        console.log("🔹 Token0 is WETH (Price ~ 2500 ECO/ETH)");
+        console.log("🔹 Token0 is WETH (Price ~ 2500 CX/ETH)");
         sqrtPriceX96 = encodePriceSqrtBigInt(2500n, 1n);
         tickLower = 69060;
         tickUpper = 85200;
     } else {
         // Price = 1/2500 ETH per ECO -> numerator/denominator = 1/2500
-        console.log("🔹 Token0 is ECO (Price ~ 0.0004 ETH/ECO)");
+        console.log("🔹 Token0 is CX (Price ~ 0.0004 ETH/CX)");
         sqrtPriceX96 = encodePriceSqrtBigInt(1n, 2500n);
         tickLower = -85200;
         tickUpper = -69060;
     }
 
-    const nftPositionManager = await ethers.getContractAt("contracts/TestInterfaces.sol:INonfungiblePositionManager", ARTIFACTS.NonfungiblePositionManager);
+    const nftPositionManager = await ethers.getContractAt("contracts/INonfungiblePositionManager.sol:INonfungiblePositionManager", ARTIFACTS.NonfungiblePositionManager);
     
         // Initialize Pool
         console.log("Initializing pool with SqrtPriceX96:", sqrtPriceX96.toString());
@@ -169,15 +169,15 @@ async function main() {
     // 4. Add Concentrated Liquidity
     console.log("💧 Adding Concentrated Liquidity...");
     
-    const amountEco = ethers.parseEther("250000"); // 250k ECO
+    const amountEco = ethers.parseEther("250000"); // 250k CX
     const amountEth = ethers.parseEther("100");    // 100 ETH
 
-    // Approve Position Manager to spend ECO
+    // Approve Position Manager to spend CX
     await ecoToken.approve(ARTIFACTS.NonfungiblePositionManager, ethers.MaxUint256);
     
     // Wrap ETH to WETH and Approve
     // We wrap extra to be safe
-    const weth = await ethers.getContractAt("contracts/TestInterfaces.sol:IWETH", ARTIFACTS.WETH);
+    const weth = await ethers.getContractAt("contracts/INonfungiblePositionManager.sol:IWETH", ARTIFACTS.WETH);
     await weth.deposit({ value: amountEth * 2n });
     await weth.approve(ARTIFACTS.NonfungiblePositionManager, ethers.MaxUint256);
 
@@ -213,7 +213,7 @@ async function main() {
     const ecoMarketplace = await EcoMarketplace.deploy(ecoNFTAddress, ecoTokenAddress);
     await ecoMarketplace.waitForDeployment();
     const marketplaceAddress = await ecoMarketplace.getAddress();
-    console.log("✅ EcoMarketplace deployed to:", marketplaceAddress);
+    console.log("✅ CarbonX Marketplace deployed to:", marketplaceAddress);
 
     // 6. Setup Permissions
     await ecoNFT.setMarketplace(marketplaceAddress);

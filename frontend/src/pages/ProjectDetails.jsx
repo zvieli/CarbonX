@@ -48,7 +48,11 @@ const ProjectDetails = () => {
             const gatewayUrl = getGatewayUrl(tokenURI);
             if (gatewayUrl) {
                 const response = await fetch(gatewayUrl);
-                metadata = await response.json();
+                const jsonMeta = await response.json();
+                if (jsonMeta.image) {
+                     jsonMeta.image = getGatewayUrl(jsonMeta.image);
+                }
+                metadata = jsonMeta;
             }
 
             setProject({
@@ -118,7 +122,7 @@ const ProjectDetails = () => {
     const buyWithEco = async () => {
         if (!listing) return;
         try {
-            setStatus("Approving EcoToken...");
+            setStatus("Approving CarbonX Token...");
             const priceWei = ethers.parseEther(listing.price);
             
             // Check Allowance
@@ -130,7 +134,7 @@ const ProjectDetails = () => {
                 await txApprove.wait();
             }
 
-            setStatus("Buy with EcoToken...");
+            setStatus("Buy with CX...");
             const txBuy = await contracts.ecoMarketplace.buyProject(id, { gasLimit: 3000000 });
             await txBuy.wait();
             
@@ -159,8 +163,8 @@ const ProjectDetails = () => {
             const ethBaseCost = listingPriceECO / ecoPerEth;
             const ethWithSlippage = ethBaseCost * 1.05; // 5% buffer (contract refunds difference)
 
-            console.log(`Price: 1 ETH = ${ecoPerEth} ECO`);
-            console.log(`Cost: ${listingPriceECO} ECO -> ${ethBaseCost} ETH`);
+            console.log(`Price: 1 ETH = ${ecoPerEth} CX`);
+            console.log(`Cost: ${listingPriceECO} CX -> ${ethBaseCost} ETH`);
             console.log(`Sending: ${ethWithSlippage} ETH (Safety buffer included)`);
 
             setStatus(`Buying with ETH (DeFi Swap)... Sending ~${ethWithSlippage.toFixed(5)} ETH`);
@@ -219,7 +223,7 @@ const ProjectDetails = () => {
                     {listing && (
                         <div className="listing-info">
                             <h3>For Sale</h3>
-                            <p className="price-tag">{listing.price} ECO</p>
+                            <p className="price-tag">{listing.price} CX</p>
                             <p>or pay with ETH (auto-swap)</p>
                         </div>
                     )}
@@ -235,7 +239,7 @@ const ProjectDetails = () => {
                              <div className="listing-input-group">
                                 <input 
                                     type="number" 
-                                    placeholder="Price in ECO" 
+                                    placeholder="Price in CX" 
                                     value={listingPrice}
                                     onChange={(e) => setListingPrice(e.target.value)}
                                     className="price-input"
@@ -256,7 +260,7 @@ const ProjectDetails = () => {
                         {!isMyToken && !project.isRetired && listing && (
                             <div className="buy-buttons">
                                 <button className="btn-primary" onClick={buyWithEco}>
-                                    Buy with ECO (Standard)
+                                    Buy with CX (Standard)
                                 </button>
                                 <button className="btn-secondary" onClick={buyWithEth}>
                                     Buy with ETH (DeFi)

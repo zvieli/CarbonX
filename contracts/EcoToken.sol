@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract EcoToken is ERC20, Ownable {
-    constructor() ERC20("EcoToken", "ECO") Ownable(msg.sender) {
+    constructor() ERC20("CarbonX Token", "CX") Ownable(msg.sender) {
         // Initial supply is 0. 
         // Admin must mint manually for liquidity.
     }

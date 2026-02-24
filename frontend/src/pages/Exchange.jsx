@@ -169,7 +169,7 @@ const Exchange = () => {
 
     const handleApprove = async () => {
         setLoading(true);
-        setStatus("Approving Max ECO...");
+        setStatus("Approving Max CX...");
 
         try {
             // Professional DeFi Standard: Approve MaxUint256 to save gas and avoid "exact amount" issues
@@ -286,15 +286,15 @@ const Exchange = () => {
 
     if (web3Loading) return <div className="container">Loading Web3...</div>;
 
-    const tokenIn = isEthToEco ? { symbol: 'ETH', name: 'Ethereum', balance: balances.eth } : { symbol: 'ECO', name: 'EcoToken', balance: balances.eco };
-    const tokenOut = isEthToEco ? { symbol: 'ECO', name: 'EcoToken', balance: balances.eco } : { symbol: 'ETH', name: 'Ethereum (WETH)', balance: balances.eth };
+    const tokenIn = isEthToEco ? { symbol: 'ETH', name: 'Ethereum', balance: balances.eth } : { symbol: 'CX', name: 'CarbonX Token', balance: balances.eco };
+    const tokenOut = isEthToEco ? { symbol: 'CX', name: 'CarbonX Token', balance: balances.eco } : { symbol: 'ETH', name: 'Ethereum (WETH)', balance: balances.eth };
 
     return (
         <div className="container exchange-page">
             <div className="swap-box glass-panel">
                 <div className="swap-header">
-                    <h2><i className="fas fa-exchange-alt"></i> Green Swap</h2>
-                    <p>Instant {isEthToEco ? "ETH » ECO" : "ECO » ETH"} Exchange</p>
+                    <h2><i className="fas fa-exchange-alt"></i> CarbonX Swap</h2>
+                    <p>Instant {isEthToEco ? "ETH » CX" : "CX » ETH"} Exchange</p>
                 </div>
 
                 <div className="swap-body">
@@ -311,8 +311,8 @@ const Exchange = () => {
                                 value={inputAmount}
                                 onChange={(e) => setInputAmount(e.target.value)}
                             />
-                            <div className={`token-badge ${tokenIn.symbol === 'ECO' ? 'eco' : ''}`}>
-                                {tokenIn.symbol === 'ECO' ? <i className="fas fa-leaf"></i> : <i className="fab fa-ethereum"></i>}
+                            <div className={`token-badge ${tokenIn.symbol === 'CX' ? 'eco' : ''}`}>
+                                {tokenIn.symbol === 'CX' ? <i className="fas fa-leaf"></i> : <i className="fab fa-ethereum"></i>}
                                 &nbsp;{tokenIn.symbol}
                             </div>
                         </div>
@@ -339,8 +339,8 @@ const Exchange = () => {
                                 value={outputAmount}
                                 className="readonly-input"
                             />
-                            <div className={`token-badge ${tokenOut.symbol === 'ECO' ? 'eco' : ''}`}>
-                                {tokenOut.symbol === 'ECO' ? <i className="fas fa-leaf"></i> : <i className="fab fa-ethereum"></i>}
+                            <div className={`token-badge ${tokenOut.symbol === 'CX' ? 'eco' : ''}`}>
+                                {tokenOut.symbol === 'CX' ? <i className="fas fa-leaf"></i> : <i className="fab fa-ethereum"></i>}
                                 &nbsp;{tokenOut.symbol}
                             </div>
                         </div>
@@ -349,7 +349,7 @@ const Exchange = () => {
                     <div className="price-info">
                         <div className="rate-row">
                             <span>Rate</span>
-                            <span>1 ETH ≈ {stats.ecoEth} ECO</span>
+                            <span>1 ETH ≈ {stats.ecoEth} CX</span>
                         </div>
                         {parseFloat(inputAmount) > 0 && (
                             <div className="rate-row" style={{marginTop: '0.5rem', color: priceImpact.color}}>
@@ -381,7 +381,7 @@ const Exchange = () => {
                                 onClick={needsApproval ? handleApprove : handleSwap}
                                 disabled={loading || (!needsApproval && (!inputAmount || parseFloat(inputAmount) <= 0))}
                             >
-                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (needsApproval ? `Enable ECO (Approve)` : "Swap Now")}
+                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : (needsApproval ? `Enable CX (Approve)` : "Swap Now")}
                             </button>
                         </div>
                     )}

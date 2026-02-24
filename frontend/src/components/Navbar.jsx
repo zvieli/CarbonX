@@ -14,7 +14,7 @@ const Navbar = () => {
             <div className="container navbar-container glass-panel">
                 <Link to="/" className="navbar-brand">
                     <img src="/op4.svg" alt="Logo" className="logo-icon" />
-                    <span className="text text-gradient">Proof Of Green</span>
+                    <span className="text text-gradient">CarbonX</span>
                 </Link>
 
                 <div className="navbar-menu">
