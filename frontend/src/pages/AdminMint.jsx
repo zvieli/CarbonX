@@ -130,7 +130,7 @@ const AdminMint = () => {
                 setProgressStep(3);
                 
                 // Approve Marketplace
-                setStatus("Approving Marketplace Contract...");
+                setStatus("Marketplace Contract Approval...");
                 const marketplaceAddress = await contracts.ecoMarketplace.getAddress();
                 const txApprove = await contracts.ecoNFT.approve(marketplaceAddress, tokenId);
                 await txApprove.wait();
@@ -139,19 +139,25 @@ const AdminMint = () => {
                 setStatus("Listing Token for Sale...");
                 const priceWei = ethers.parseEther(formData.price.toString());
                 const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
-                await txList.wait();
+                const listReceipt = await txList.wait();
+                console.log("Listing Receipt:", listReceipt);
                 
                 setStatus("Project Successfully Launched! Redirecting...");
+                
+                setTimeout(() => {
+                    navigate('/');
+                }, 3000);
             } else {
-                setStatus(`Project Minted to ${finalCreator.slice(0,6)}...! (Auto-Listing skipped as you are not the owner)`);
+                setStatus(`✅ Minted to ${finalCreator.slice(0,6)}... \n⚠️ AUTO-LISTING SKIPPED: Only the owner can list this asset.`);
                 // Skip listing step visually
                 setProgressStep(2); 
+                
+                // Give user time to read the message before redirect
+                setTimeout(() => {
+                    navigate('/');
+                }, 6000);
             }
 
-            // Redirect to Dashboard
-            setTimeout(() => {
-                navigate('/');
-            }, 3000);
             if (finalCreator.toLowerCase() === adminAddress.toLowerCase()) {
                 setProgressStep(4); // Done
             }
