@@ -99,11 +99,14 @@ const AdminMint = () => {
                 ? formData.creatorAddress 
                 : adminAddress;
 
+            const priceWei = ethers.parseEther(formData.price.toString());
+
             const txMint = await contracts.ecoNFT.mintProject(
                 finalCreator, // New Signature: creator first
                 formData.tons,
                 formData.expiryDays,
-                tokenURI
+                tokenURI,
+                priceWei // Suggested Price
             );
             
             setStatus("Waiting for Block Confirmation...");
@@ -137,7 +140,7 @@ const AdminMint = () => {
 
                 // List Project
                 setStatus("Listing Token for Sale...");
-                const priceWei = ethers.parseEther(formData.price.toString());
+                // priceWei is already calculated above
                 const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
                 const listReceipt = await txList.wait();
                 console.log("Listing Receipt:", listReceipt);
@@ -189,11 +192,6 @@ const AdminMint = () => {
                             <div className="step-icon"><i className="fas fa-cube"></i></div>
                             <span>Mint</span>
                         </div>
-                        <div className={`step-line ${progressStep >= 3 ? 'active' : ''}`}></div>
-                        <div className={`step-item ${progressStep >= 3 ? 'active' : ''} ${progressStep >= 3 ? 'completed' : ''}`}>
-                            <div className="step-icon"><i className="fas fa-tag"></i></div>
-                            <span>List</span>
-                        </div>
                     </div>
 
                     <form onSubmit={handleSubmit}>
@@ -234,8 +232,11 @@ const AdminMint = () => {
                         </div>
 
                         <div className="form-group">
-                            <label>Listing Price (CX)</label>
+                            <label>Listing Price (CX) - Suggested</label>
                             <input name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} placeholder="e.g. 500" />
+                            <small className="form-text text-muted" style={{display:'block', marginTop:'4px', fontSize:'0.8em'}}>
+                                Sets a recommended price. If minting to yourself, this is the initial listing price.
+                            </small>
                         </div>
 
                         <div className="form-group">

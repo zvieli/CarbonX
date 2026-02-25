@@ -215,8 +215,8 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
             console.log("       Buyer  :", buyerStandard.address);
 
             // 1. Mint directly to Creator (Decentralized)
-            // New Signature: creator, tons, expiry, uri
-            await ecoNFT.connect(owner).mintProject(distinctCreator.address, 100000n, 1000n, "https://ipfs.io/ipfs/test");
+            // New Signature: creator, tons, expiry, uri, suggestedPrice
+            await ecoNFT.connect(owner).mintProject(distinctCreator.address, 100000n, 1000n, "https://ipfs.io/ipfs/test", 0);
             
             // VERIFY: Creator owns the NFT immediately
             expect(await ecoNFT.ownerOf(NFT_ID)).to.equal(distinctCreator.address);
@@ -280,7 +280,7 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
     describe("3.5. Validation Logic (Expiry & Retirement)", function () {
         it("Should FAIL to list an Expired NFT", async function () {
             // Mint with short expiry (1 day). Creator = seller.
-            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 1n, "ipfs://fail"); 
+            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 1n, "ipfs://fail", 0); 
             
             // Get ID via enumeration
             const balance = await ecoNFT.balanceOf(seller.address);
@@ -300,7 +300,7 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
 
         it("Should FAIL to list a Retired NFT", async function () {
             // Mint fresh NFT to seller
-            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 365n, "ipfs://retired");
+            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 365n, "ipfs://retired", 0);
             const balance = await ecoNFT.balanceOf(seller.address);
             const id = await ecoNFT.tokenOfOwnerByIndex(seller.address, balance - 1n);
 
@@ -317,7 +317,7 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
 
         it("Should FAIL to buy an NFT that expired while listed", async function () {
             // Mint fresh NFT to seller
-            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 1n, "ipfs://expire_listed");
+            await ecoNFT.connect(owner).mintProject(seller.address, 100n, 1n, "ipfs://expire_listed", 0);
             const balance = await ecoNFT.balanceOf(seller.address);
             const id = await ecoNFT.tokenOfOwnerByIndex(seller.address, balance - 1n);
 
@@ -526,6 +526,48 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
             } else {
                 expect(slot0After.tick).to.be.lt(-69060); // Upper boundary for CX=token0
             }
+        });
+    });
+
+    // --------------------------------------------------------------------------------
+    // TEST 6: On-Chain History & Suggested Price
+    // --------------------------------------------------------------------------------
+    describe("6. On-Chain History & Suggested Price", function () {
+        it("Should record ownership history on Mint and Transfer", async function () {
+            const suggestedPrice = ethers.parseEther("500");
+            // Mint to Seller 
+            const newSeller = seller; // Use existing seller
+            const tons = 50n;
+            const expiry = 365n;
+            const uri = "ipfs://history";
+
+            // Mint
+            await ecoNFT.connect(owner).mintProject(newSeller.address, tons, expiry, uri, suggestedPrice);
+            
+            // Get ID (Should be last minted)
+            const totalSupply = await ecoNFT.totalSupply();
+            const id = await ecoNFT.tokenByIndex(totalSupply - 1n);
+
+            // Check Suggested Price
+            expect(await ecoNFT.suggestedPrices(id)).to.equal(suggestedPrice);
+
+            // Transfer Seller -> Buyer
+            await ecoNFT.connect(newSeller).transferFrom(newSeller.address, buyerStandard.address, id);
+
+            // Check History via getter (index based)
+            // ownershipHistory(tokenId, index) returns (from, to, timestamp)
+            
+            // Record 0: Mint (0x0 -> Seller)
+            const record0 = await ecoNFT.ownershipHistory(id, 0);
+            expect(record0[0]).to.equal(ethers.ZeroAddress); // from
+            expect(record0[1]).to.equal(newSeller.address); // to
+            
+            // Record 1: Transfer (Seller -> Buyer)
+            const record1 = await ecoNFT.ownershipHistory(id, 1);
+            expect(record1[0]).to.equal(newSeller.address); // from
+            expect(record1[1]).to.equal(buyerStandard.address); // to
+            
+            console.log("    📜 History Verified: Mint -> Transfer");
         });
     });
 });

@@ -16,6 +16,12 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
         address originalCreator;
     }
 
+    struct TransferRecord {
+        address from;
+        address to;
+        uint256 timestamp;
+    }
+
     event ProjectRetired(uint256 indexed tokenId);
 
     error NotMarketplace();
@@ -25,6 +31,8 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
     mapping(uint256 => ProjectData) public projects;
     mapping(uint256 => uint256[]) public priceHistory;
     mapping(uint256 => address) public projectCreators;
+    mapping(uint256 => TransferRecord[]) public ownershipHistory;
+    mapping(uint256 => uint256) public suggestedPrices;
 
     uint256 private _nextTokenId;
     address public marketplace;
@@ -40,10 +48,15 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
         marketplace = newMarketplace;
     }
 
-    function mintProject(address creator, uint256 tons, uint256 expiryDays, string memory uri) external onlyOwner returns (uint256) {
+    function mintProject(address creator, uint256 tons, uint256 expiryDays, string memory uri, uint256 _suggestedPrice) external onlyOwner returns (uint256) {
         if (expiryDays == 0) revert InvalidExpiry();
         uint256 tokenId = ++_nextTokenId;
         
+        // Save Suggested Price
+        if (_suggestedPrice > 0) {
+            suggestedPrices[tokenId] = _suggestedPrice;
+        }
+
         // Mint directly to the Creator (Decentralized distribution)
         _safeMint(creator, tokenId);
         _setTokenURI(tokenId, uri);
@@ -91,10 +104,23 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
     }
 
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
-        return super._update(to, tokenId, auth);
+        address previousOwner = super._update(to, tokenId, auth);
+        
+        // Record History
+        ownershipHistory[tokenId].push(TransferRecord({
+            from: previousOwner,
+            to: to,
+            timestamp: block.timestamp
+        }));
+
+        return previousOwner;
     }
 
     function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
         super._increaseBalance(account, value);
+    }
+
+    function getProjectHistory(uint256 tokenId) external view returns (TransferRecord[] memory) {
+        return ownershipHistory[tokenId];
     }
 }

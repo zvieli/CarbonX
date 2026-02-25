@@ -147,3 +147,106 @@
     border-color: white;
     color: white;
 }
+
+/* --- Status Badges --- */
+.status-badge-large {
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    width: 100%;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.not-listed-badge {
+    background: rgba(40, 40, 40, 0.5);
+    border: 1px solid #444;
+    color: #888;
+}
+
+/* --- History Section --- */
+.history-section {
+    grid-column: 2; /* Move to the right column only */
+    margin-top: 0; /* Align with top content if needed, or keep spacing */
+    background: #1a1a1a; 
+    padding: 1.5rem;
+    border-radius: 12px;
+    height: fit-content; /* Don't stretch vertically if not needed */
+}
+
+@media (max-width: 768px) {
+    .history-section {
+        grid-column: 1; /* On mobile, take full width */
+    }
+}
+
+.history-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.5rem; /* Space between rows */
+}
+
+.history-table th {
+    text-align: left;
+    color: #888;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding: 0 1rem 0.5rem 1rem;
+}
+
+.history-table tbody tr {
+    transition: transform 0.2s;
+}
+
+.history-table tbody tr:hover {
+    transform: translateX(5px);
+}
+
+.history-table td {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    color: #ddd;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+    font-size: 0.9rem;
+}
+
+.history-table td:first-child {
+    border-left: 1px solid #333;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    font-family: monospace;
+    color: var(--accent-primary); /* Highlight FROM address */
+}
+
+.history-table td:nth-child(2) {
+    font-family: monospace;
+}
+
+.history-table th:last-child {
+    text-align: right;
+    padding-right: 2rem; /* Align header slightly inwards if needed */
+}
+
+.history-table td:last-child {
+    border-right: 1px solid #333;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    color: #888;
+    text-align: right;
+}
+

@@ -35,8 +35,8 @@ contract EcoMarketplace is ReentrancyGuard {
 
     mapping(uint256 => Listing) public listings;
     
-    event ProjectListed(uint256 indexed tokenId, address indexed seller, uint256 price);
-    event ProjectSold(uint256 indexed tokenId, address indexed buyer, uint256 price);
+    event ProjectListed(uint256 indexed tokenId, address indexed seller, uint256 price, uint256 timestamp);
+    event ProjectSold(uint256 indexed tokenId, address indexed buyer, uint256 price, uint256 timestamp);
 
     error NotListed();
     error AlreadySold();
@@ -61,7 +61,7 @@ contract EcoMarketplace is ReentrancyGuard {
             sold: false
         });
 
-        emit ProjectListed(tokenId, msg.sender, price);
+        emit ProjectListed(tokenId, msg.sender, price, block.timestamp);
     }
 
     // Standard Buy: User pays with EcoToken (Requires Approve)
@@ -94,7 +94,7 @@ contract EcoMarketplace is ReentrancyGuard {
         listing.sold = true;
         nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
 
-        emit ProjectSold(tokenId, msg.sender, listing.price);
+        emit ProjectSold(tokenId, msg.sender, listing.price, block.timestamp);
     }
 
     // Advanced Buy: User pays with ETH -> Auto-Swap to EcoToken -> Buy
@@ -158,7 +158,7 @@ contract EcoMarketplace is ReentrancyGuard {
         listing.sold = true;
         nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
 
-        emit ProjectSold(tokenId, msg.sender, listing.price);
+        emit ProjectSold(tokenId, msg.sender, listing.price, block.timestamp);
     }
 
     // Allow receiving ETH (for WETH unwrapping)

@@ -12,6 +12,7 @@ const ProjectDetails = () => {
     const { contracts, isOwner, account } = useWeb3();
     const [project, setProject] = useState(null);
     const [listing, setListing] = useState(null); // Stores listing info
+    const [history, setHistory] = useState([]); // Array of {from, to, timestamp}
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState("");
 
@@ -41,6 +42,29 @@ const ProjectDetails = () => {
                 });
             } else {
                 setListing(null);
+            }
+
+            // Fetch Suggested Price (for owner listing)
+            try {
+                const suggested = await contracts.ecoNFT.suggestedPrices(id);
+                if (suggested > 0n) {
+                    setListingPrice(ethers.formatEther(suggested));
+                }
+            } catch (e) {
+                console.log("No suggested price or fetch failed");
+            }
+
+            // Fetch History
+            try {
+                const history = await contracts.ecoNFT.getProjectHistory(id);
+                // history is array of [from, to, timestamp]
+                setHistory(history.map(record => ({
+                    from: record[0],
+                    to: record[1],
+                    timestamp: new Date(Number(record[2]) * 1000).toLocaleString()
+                })));
+            } catch (e) {
+                console.log("No history", e);
             }
 
             // IPFS Fetch
@@ -269,14 +293,41 @@ const ProjectDetails = () => {
                         )}
                         
                         {!isMyToken && !project.isRetired && !listing && (
-                            <button className="btn-disabled" disabled>
-                                Not Listed
-                            </button>
+                            <div className="status-badge-large not-listed-badge">
+                                <i className="fas fa-eye-slash"></i> Not Listed for Sale
+                            </div>
                         )}
 
 
                     </div>
                      {status && <p className="status-message">{status}</p>}
+                </div>
+                
+                {/* History Table */}
+                <div className="card full-width history-section">
+                    <h3>Ownership History</h3>
+                    <table className="history-table">
+                        <thead>
+                            <tr>
+                                <th>From</th>
+                                <th>To</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {history.length === 0 ? (
+                                <tr><td colSpan="3">No history recorded</td></tr>
+                            ) : (
+                                history.map((record, index) => (
+                                    <tr key={index}>
+                                        <td className="mono">{record.from === ethers.ZeroAddress ? "MINT" : record.from.substring(0,6) + "..." + record.from.substring(38)}</td>
+                                        <td className="mono">{record.to === ethers.ZeroAddress ? "BURN" : record.to.substring(0,6) + "..." + record.to.substring(38)}</td>
+                                        <td>{record.timestamp}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
