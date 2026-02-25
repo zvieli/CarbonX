@@ -24,6 +24,7 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
 
     mapping(uint256 => ProjectData) public projects;
     mapping(uint256 => uint256[]) public priceHistory;
+    mapping(uint256 => address) public projectCreators;
 
     uint256 private _nextTokenId;
     address public marketplace;
@@ -33,24 +34,28 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
         _;
     }
 
-    constructor() ERC721("ProofOfGreen Credit", "POG") Ownable(msg.sender) {}
+    constructor() ERC721("CarbonX Credit", "CXC") Ownable(msg.sender) {}
 
     function setMarketplace(address newMarketplace) external onlyOwner {
         marketplace = newMarketplace;
     }
 
-    function mintProject(address to, uint256 tons, uint256 expiryDays, string memory uri) external onlyOwner returns (uint256) {
+    function mintProject(address creator, uint256 tons, uint256 expiryDays, string memory uri) external onlyOwner returns (uint256) {
         if (expiryDays == 0) revert InvalidExpiry();
         uint256 tokenId = ++_nextTokenId;
-        _safeMint(to, tokenId);
+        
+        // Mint directly to the Creator (Decentralized distribution)
+        _safeMint(creator, tokenId);
         _setTokenURI(tokenId, uri);
+
+        projectCreators[tokenId] = creator;
 
         projects[tokenId] = ProjectData({
             carbonTons: uint128(tons),
             creationDate: uint64(block.timestamp),
             expiryDate: uint64(block.timestamp + (expiryDays * 1 days)),
             isRetired: false,
-            originalCreator: to
+            originalCreator: creator
         });
 
         return tokenId;

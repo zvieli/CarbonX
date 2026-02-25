@@ -41,6 +41,7 @@ const encodePriceSqrtBigInt = (reserve1, reserve0) => {
 async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("🚀 Deploying CarbonX (CX) environment with account:", deployer.address);
+    console.log("----------------------------------------------------");
 
     // Dummy transaction to change nonce and generate fresh addresses
     console.log("🔄 Sending dummy transaction to reset nonce...");

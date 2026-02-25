@@ -141,7 +141,7 @@ const ProjectDetails = () => {
             setStatus("Purchase Successful!");
             setTimeout(() => navigate('/'), 2000);
         } catch (error) {
-            console.error("Buy ECO failed:", error);
+            console.error("Buy CX failed:", error);
             setStatus("Purchase failed: " + (error.reason || error.message));
         }
     };

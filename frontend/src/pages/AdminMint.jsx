@@ -14,7 +14,8 @@ const AdminMint = () => {
         description: '',
         tons: '',
         expiryDays: '365', // Default 1 year
-        price: '' // New Price Field
+        price: '', // New Price Field
+        creatorAddress: '' // Optional Creator Address for Royalties
     });
     const [file, setFile] = useState(null);
     const [preview, setPreview] = useState(null); // Image Preview
@@ -56,8 +57,16 @@ const AdminMint = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Basic Validation
         if (!file || !formData.name || !formData.tons || !formData.price) {
             setStatus("Please fill in all fields (including Price).");
+            return;
+        }
+
+        // Address Validation
+        if (formData.creatorAddress && !ethers.isAddress(formData.creatorAddress)) {
+            setStatus("Error: Invalid Creator Wallet Address.");
             return;
         }
 
@@ -85,8 +94,13 @@ const AdminMint = () => {
             setStatus("Minting CarbonX Project...");
             
             const adminAddress = await contracts.ecoNFT.runner.getAddress();
+            // detailed: Use user input if valid, else default to admin
+            const finalCreator = (formData.creatorAddress && ethers.isAddress(formData.creatorAddress)) 
+                ? formData.creatorAddress 
+                : adminAddress;
+
             const txMint = await contracts.ecoNFT.mintProject(
-                adminAddress, 
+                finalCreator, // New Signature: creator first
                 formData.tons,
                 formData.expiryDays,
                 tokenURI
@@ -111,26 +125,36 @@ const AdminMint = () => {
             console.log("Minted Token ID:", tokenId.toString());
 
             // --- Step 3: Listing (Approve + List) ---
-            setProgressStep(3);
-            
-            // Approve Marketplace
-            setStatus("Approving Marketplace Contract...");
-            const marketplaceAddress = await contracts.ecoMarketplace.getAddress();
-            const txApprove = await contracts.ecoNFT.approve(marketplaceAddress, tokenId);
-            await txApprove.wait();
+            // Only list if Admin owns it (i.e. creator == admin)
+            if (finalCreator.toLowerCase() === adminAddress.toLowerCase()) {
+                setProgressStep(3);
+                
+                // Approve Marketplace
+                setStatus("Approving Marketplace Contract...");
+                const marketplaceAddress = await contracts.ecoMarketplace.getAddress();
+                const txApprove = await contracts.ecoNFT.approve(marketplaceAddress, tokenId);
+                await txApprove.wait();
 
-            // List Project
-            setStatus("Listing Token for Sale...");
-            const priceWei = ethers.parseEther(formData.price.toString());
-            const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
-            await txList.wait();
+                // List Project
+                setStatus("Listing Token for Sale...");
+                const priceWei = ethers.parseEther(formData.price.toString());
+                const txList = await contracts.ecoMarketplace.listProject(tokenId, priceWei);
+                await txList.wait();
+                
+                setStatus("Project Successfully Launched! Redirecting...");
+            } else {
+                setStatus(`Project Minted to ${finalCreator.slice(0,6)}...! (Auto-Listing skipped as you are not the owner)`);
+                // Skip listing step visually
+                setProgressStep(2); 
+            }
 
-            setStatus("Project Successfully Launched! Redirecting...");
             // Redirect to Dashboard
             setTimeout(() => {
                 navigate('/');
-            }, 2000);
-            setProgressStep(4); // Done
+            }, 3000);
+            if (finalCreator.toLowerCase() === adminAddress.toLowerCase()) {
+                setProgressStep(4); // Done
+            }
             
         } catch (error) {
             console.error(error);
@@ -187,6 +211,20 @@ const AdminMint = () => {
                                 <label>Expiry (Days)</label>
                                 <input name="expiryDays" type="number" value={formData.expiryDays} onChange={handleChange} />
                             </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Creator Wallet (Optional)</label>
+                            <input 
+                                name="creatorAddress" 
+                                value={formData.creatorAddress} 
+                                onChange={handleChange} 
+                                placeholder="0x... (Leave empty to use your address)" 
+                                className="font-mono text-sm"
+                            />
+                            <small className="form-text text-muted" style={{display:'block', marginTop:'4px', fontSize:'0.8em', color:'#888'}}>
+                                Receives 10% royalty on sales. Defaults to Admin if empty.
+                            </small>
                         </div>
 
                         <div className="form-group">

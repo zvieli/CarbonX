@@ -15,6 +15,7 @@ interface IWETH is IERC20 {
 
 interface IEcoNFT {
     function projects(uint256 tokenId) external view returns (uint128, uint64, uint64, bool, address);
+    function projectCreators(uint256 tokenId) external view returns (address);
 }
 
 contract EcoMarketplace is ReentrancyGuard {
@@ -48,9 +49,10 @@ contract EcoMarketplace is ReentrancyGuard {
     }
 
     function listProject(uint256 tokenId, uint256 price) external {
-        // Prevent listing of retired NFTs
-        (,,, bool isRetired,) = IEcoNFT(address(nftContract)).projects(tokenId);
+        // Prevent listing of retired or expired NFTs
+        (,, uint64 expiryDate, bool isRetired,) = IEcoNFT(address(nftContract)).projects(tokenId);
         require(!isRetired, "Cannot list retired NFT");
+        require(block.timestamp < expiryDate, "Cannot list expired NFT");
         
         listings[tokenId] = Listing({
             tokenId: tokenId,
@@ -68,7 +70,26 @@ contract EcoMarketplace is ReentrancyGuard {
         if (listing.price == 0) revert NotListed();
         if (listing.sold) revert AlreadySold();
 
-        ecoToken.safeTransferFrom(msg.sender, listing.seller, listing.price);
+        // Check if expired during listing
+        (,, uint64 expiryDate, bool isRetired,) = IEcoNFT(address(nftContract)).projects(tokenId);
+        require(!isRetired, "NFT is retired");
+        require(block.timestamp < expiryDate, "NFT has expired");
+
+        // Calculate 10% royalty
+        uint256 royalty = (listing.price * 10) / 100;
+        uint256 sellerAmount = listing.price - royalty;
+
+        address creator = IEcoNFT(address(nftContract)).projectCreators(tokenId);
+        
+        // Transfer royalty to creator
+        if (creator != address(0)) {
+             ecoToken.safeTransferFrom(msg.sender, creator, royalty);
+        } else {
+             sellerAmount += royalty;
+        }
+
+        // Transfer remaining to seller
+        ecoToken.safeTransferFrom(msg.sender, listing.seller, sellerAmount);
 
         listing.sold = true;
         nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
@@ -81,6 +102,11 @@ contract EcoMarketplace is ReentrancyGuard {
         Listing storage listing = listings[tokenId];
         if (listing.price == 0) revert NotListed();
         if (listing.sold) revert AlreadySold();
+        
+        // Check if expired during listing
+        (,, uint64 expiryDate, bool isRetired,) = IEcoNFT(address(nftContract)).projects(tokenId);
+        require(!isRetired, "NFT is retired");
+        require(block.timestamp < expiryDate, "NFT has expired");
 
         // 1. Wrap ETH
         IWETH(WETH9).deposit{value: msg.value}();
@@ -115,7 +141,19 @@ contract EcoMarketplace is ReentrancyGuard {
         IERC20(WETH9).approve(address(swapRouter), 0);
 
         // 6. Complete Purchase
-        ecoToken.safeTransfer(listing.seller, listing.price);
+        // Calculate 10% royalty
+        uint256 royalty = (listing.price * 10) / 100;
+        uint256 sellerAmount = listing.price - royalty;
+
+        address creator = IEcoNFT(address(nftContract)).projectCreators(tokenId);
+
+        if (creator != address(0)) {
+             ecoToken.safeTransfer(creator, royalty);
+        } else {
+             sellerAmount += royalty;
+        }
+
+        ecoToken.safeTransfer(listing.seller, sellerAmount);
         
         listing.sold = true;
         nftContract.safeTransferFrom(listing.seller, msg.sender, tokenId);
