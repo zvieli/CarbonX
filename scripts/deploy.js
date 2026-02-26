@@ -82,26 +82,39 @@ async function main() {
         console.log("Contracts saved to frontend/contracts");
     };
 
-    // 1. Deploy EcoNFT
-    const EcoNFT = await ethers.getContractFactory("EcoNFT");
-    const ecoNFT = await EcoNFT.deploy();
-    await ecoNFT.waitForDeployment();
-    const ecoNFTAddress = await ecoNFT.getAddress();
-    console.log("✅ CarbonX NFT deployed to:", ecoNFTAddress);
-
-    // 2. Deploy EcoToken (ERC20)
+    // 1. Deploy EcoToken (ERC20) - FIRST
     const EcoToken = await ethers.getContractFactory("EcoToken");
     const ecoToken = await EcoToken.deploy();
     await ecoToken.waitForDeployment();
     const ecoTokenAddress = await ecoToken.getAddress();
     console.log("✅ CarbonX Token (CX) deployed to:", ecoTokenAddress);
 
+    // 2. Deploy EcoNFT (ERC721) - SECOND (Depends on EcoToken)
+    const EcoNFT = await ethers.getContractFactory("EcoNFT");
+    const ecoNFT = await EcoNFT.deploy(ecoTokenAddress);
+    await ecoNFT.waitForDeployment();
+    const ecoNFTAddress = await ecoNFT.getAddress();
+    console.log("✅ CarbonX NFT deployed to:", ecoNFTAddress);
+
     // Initial Mint for Liquidity (Admin Allocation)
     console.log("🌱 Minting initial 250,000 CX for liquidity...");
     await (await ecoToken.mint(deployer.address, ethers.parseEther('250000'))).wait();
     console.log("✅ Minted.");
 
-    // 3. Create Uniswap V3 Pool (WETH / CX) - Concentrated Liquidity
+    // 3. Deploy EcoMarketplace (Depends on EcoNFT and EcoToken)
+    const EcoMarketplace = await ethers.getContractFactory("EcoMarketplace");
+    const ecoMarketplace = await EcoMarketplace.deploy(ecoNFTAddress, ecoTokenAddress);
+    await ecoMarketplace.waitForDeployment();
+    const ecoMarketplaceAddress = await ecoMarketplace.getAddress();
+    console.log("✅ EcoMarketplace deployed to:", ecoMarketplaceAddress);
+
+    // 4. Configuration: Link Contracts
+    console.log("🔗 Config: Linking Contracts...");
+    await ecoNFT.setMarketplace(ecoMarketplaceAddress);
+    await ecoNFT.setExempt(ecoMarketplaceAddress, true); // Exempt Marketplace from Royalties
+    console.log("   > Marketplace set in NFT contract & Exempted");
+
+    // 5. Create Uniswap V3 Pool (WETH / CX) - Concentrated Liquidity
     console.log("🌊 Creating Concentrated Liquidity Pool...");
     
     // Sort tokens strictly by address (Uniswap Requirement)
@@ -209,21 +222,11 @@ async function main() {
     await tx.wait();
     console.log("✅ Concentrated Liquidity Added successfully");
 
-    // 5. Deploy EcoMarketplace
-    const EcoMarketplace = await ethers.getContractFactory("EcoMarketplace");
-    const ecoMarketplace = await EcoMarketplace.deploy(ecoNFTAddress, ecoTokenAddress);
-    await ecoMarketplace.waitForDeployment();
-    const marketplaceAddress = await ecoMarketplace.getAddress();
-    console.log("✅ CarbonX Marketplace deployed to:", marketplaceAddress);
-
-    // 6. Setup Permissions
-    await ecoNFT.setMarketplace(marketplaceAddress);
-    
     // Save Artifacts
     await saveFrontendFiles({
         EcoNFT: ecoNFTAddress,
         EcoToken: ecoTokenAddress,
-        EcoMarketplace: marketplaceAddress
+        EcoMarketplace: ecoMarketplaceAddress
     });
 }
 

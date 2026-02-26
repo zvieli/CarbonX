@@ -27,10 +27,16 @@ const Marketplace = () => {
             const totalSupply = await contracts.ecoNFT.totalSupply();
             const loadedProjects = [];
 
-            // Loop backwards to show newest first, limit to 20 for now
+            // Loop backwards using tokenByIndex to handle burned tokens correctly
             const total = Number(totalSupply);
-            for (let i = total; i > 0 && i > total - 20; i--) {
-                const tokenId = i;
+            for (let i = total - 1; i >= 0 && i >= total - 20; i--) {
+                let tokenId;
+                try {
+                    tokenId = await contracts.ecoNFT.tokenByIndex(i);
+                } catch (e) {
+                    console.warn("Skipping token index", i, e);
+                    continue;
+                }
                 
                 // Fetch Chain Data
                 const projectData = await contracts.ecoNFT.projects(tokenId);

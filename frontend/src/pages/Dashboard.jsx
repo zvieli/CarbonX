@@ -44,6 +44,22 @@ const Dashboard = () => {
         }
     };
 
+    const handleEnableExternalTransfers = async () => {
+        try {
+            setActionLoading(true);
+            setStatus('Approving External Transfers...');
+            const tx = await contracts.ecoToken.approve(contracts.ecoNFT.target, ethers.MaxUint256);
+            await tx.wait();
+            setStatus('External Transfers Enabled!');
+            alert('Success! You can now transfer tokens via MetaMask while supporting creators.');
+        } catch (error) {
+            console.error(error);
+            setStatus('Approval Failed: ' + (error.reason || error.message));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     if (loading) return (
         <div className="container dashboard-loading">
             <div className="spinner"></div>
@@ -67,7 +83,14 @@ const Dashboard = () => {
                     </div>
                 </div>
                 <div className="header-actions">
-                    {/* Faucet removed */}
+                    <button 
+                        className="cta-button secondary small"
+                        onClick={handleEnableExternalTransfers}
+                        disabled={actionLoading}
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                    >
+                        Enable External Transfers
+                    </button>
                 </div>
             </div>
 
@@ -110,7 +133,7 @@ const Dashboard = () => {
                 <div className="empty-state">
                     <i className="fas fa-leaf fa-3x"></i>
                     <p>No carbon credits found. Visit the Marketplace!</p>
-                    <Link to="/" className="btn-secondary">Go to Marketplace</Link>
+                    <Link to="/marketplace" className="btn-secondary">Go to Marketplace</Link>
                 </div>
             ) : (
                 <div className="assets-grid">

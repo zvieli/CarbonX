@@ -35,7 +35,7 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
         const ecoTokenAddress = await ecoToken.getAddress();
 
         const EcoNFT = await ethers.getContractFactory("EcoNFT");
-        ecoNFT = await EcoNFT.deploy();
+        ecoNFT = await EcoNFT.deploy(ecoTokenAddress);
         await ecoNFT.waitForDeployment();
         const ecoNFTAddress = await ecoNFT.getAddress();
 
@@ -120,8 +120,10 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
         await ecoMarketplace.waitForDeployment();
 
         // Connect Marketplace to NFT
-        await ecoNFT.setMarketplace(await ecoMarketplace.getAddress());
-        console.log("✅ Marketplace Deployed & Linked");
+        const marketplaceAddress = await ecoMarketplace.getAddress();
+        await ecoNFT.setMarketplace(marketplaceAddress);
+        await ecoNFT.setExempt(marketplaceAddress, true); // Exempt Marketplace
+        console.log("✅ Marketplace Deployed, Linked & Exempted");
 
         // Get Pool Contract for Verification
         // Use full path for external artifacts

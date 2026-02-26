@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC721Enumerable } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import { ERC721URIStorage } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
@@ -33,16 +34,24 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
     mapping(uint256 => address) public projectCreators;
     mapping(uint256 => TransferRecord[]) public ownershipHistory;
     mapping(uint256 => uint256) public suggestedPrices;
+    mapping(address => bool) public isExempt;
 
     uint256 private _nextTokenId;
     address public marketplace;
+    IERC20 public ecoToken;
 
     modifier onlyMarketplace() {
         if (msg.sender != marketplace) revert NotMarketplace();
         _;
     }
 
-    constructor() ERC721("CarbonX Credit", "CXC") Ownable(msg.sender) {}
+    constructor(address _ecoToken) ERC721("CarbonX Credit", "CXC") Ownable(msg.sender) {
+        ecoToken = IERC20(_ecoToken);
+    }
+
+    function setExempt(address account, bool status) external onlyOwner {
+        isExempt[account] = status;
+    }
 
     function setMarketplace(address newMarketplace) external onlyOwner {
         marketplace = newMarketplace;
