@@ -115,13 +115,34 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
         address previousOwner = super._update(to, tokenId, auth);
         
-        // Record History
-        ownershipHistory[tokenId].push(TransferRecord({
-            from: previousOwner,
-            to: to,
-            timestamp: block.timestamp
-        }));
+        // Record Ownership History
+        // We record Mints (previousOwner=0) and Transfers. We can skip Burns (to=0) if desired, 
+        // but typically history ends there. Let's record everything where 'to' is not 0 (active token).
+        if (to != address(0)) {
+           ownershipHistory[tokenId].push(TransferRecord({
+               from: previousOwner,
+               to: to,
+               timestamp: block.timestamp
+           }));
+        }
 
+        // Royalty Logic (Enforced on standard transfers ONLY)
+        // Skip Mint (previousOwner == 0) and Burn (to == 0)
+        if (previousOwner != address(0) && to != address(0)) {
+           // If the msg.sender (operator) is NOT exempt (e.g., Marketplace), we enforce royalty payment here.
+           if (!isExempt[msg.sender]) {
+               uint256 royalty = (suggestedPrices[tokenId] * 10) / 100;
+               address creator = projectCreators[tokenId];
+               
+               // Only charge if there is a price, a creator, and it's not a self-transfer
+               if (royalty > 0 && creator != address(0) && previousOwner != creator) {
+                   // Pull tokens from the PREVIOUS OWNER to the Creator
+                   // User must have approved EcoNFT to spend their EcoToken
+                   bool success = ecoToken.transferFrom(previousOwner, creator, royalty);
+                   require(success, "Royalty transfer failed: Approve EcoNFT first");
+               }
+           }
+        }
         return previousOwner;
     }
 
