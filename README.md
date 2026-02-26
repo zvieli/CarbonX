@@ -1,103 +1,116 @@
-# CarbonX (CX)
+# CarbonX (CX) - Decentralized Carbon Credit Marketplace
 
-This repository is a small DeFi / carbon‑credit demo combining an ERC20 token (CX), ERC721 carbon‑credit NFTs, a marketplace and Uniswap V3 liquidity to showcase lifecycle flows for issuing, listing, buying and retiring carbon credits.
+**CarbonX** is a comprehensive blockchain platform demonstrating the full lifecycle of Carbon Credits on Ethereum. It integrates ERC20 tokens, ERC721 NFTs, a decentralized marketplace, and Uniswap V3 liquidity to allow seamless trading, retiring, and tracking of environmental assets.
 
-**Current project status (2026-02-23)**
+---
 
-- Goal: provide a minimal environment to mint carbon‑credit NFTs, inject liquidity (Uniswap V3), trade credits and permanently retire them to record offsets on‑chain.
-- Contracts:
-   - `EcoToken.sol` (ERC20): initial supply is now 0; owner can `mint(...)`. The `faucet()` helper has been removed.
-   - `EcoNFT.sol` (ERC721Enumerable): stores `projects[tokenId]` with `carbonTons`, `expiryDate`, `isRetired`. `retire()` marks a project retired and emits `ProjectRetired`.
-   - `EcoMarketplace.sol`: marketplace with listing/buying flows; `listProject` now rejects listing if the NFT `isRetired`.
+## 🚀 Key Features
 
-- Frontend:
-   - Main pages: Dashboard (root `/`), Marketplace (`/marketplace`), Exchange (`/exchange`), Admin (`/admin`), Project details (`/project/:id`).
-   - `useUserDashboard` hook fetches balances, NFTs and metadata (IPFS gateway conversion) and computes summaries. `totalCarbonOffset` counts only retired NFTs.
-   - After actions (mint, list, buy, retire) the UI navigates back to the Dashboard (`/`) to reflect updated state.
-   - Calls which previously risked gas estimation issues include `gasLimit: 3000000` where appropriate (e.g. `retire`, marketplace buys).
+### 1. **EcoNFT (ERC721 Enumerable)**
+- Represents a **Carbon Project** with metadata: `Carbon Tons`, `Expiry Date`, `IsRetired`.
+- **On-Chain History:** Tracks transfer ownership history immutably.
+- **Enforced Royalties:** 10% royalty paid to the original creator on **every** transfer (even OTC/Wallet-to-Wallet).
+- **Retirement Mechanism:** Permanently burns the credit usage (state change) to offset carbon emissions.
 
-- Scripts:
-   - `scripts/deploy.js` deploys contracts, mints the exact amount needed for liquidity (`ecoToken.mint(deployer, 250000)`), initializes Uniswap V3 pool and adds concentrated liquidity, and writes artifacts to `frontend/contracts`.
+### 2. **EcoToken (ERC20)**
+- The native currency of the platform.
+- Used for purchasing credits and paying royalties.
 
-- Tests: `test/EcoDeFi.test.js` contains integration/stability checks executed against Hardhat (or a fork).
+### 3. **EcoMarketplace**
+- Trustless trading of Carbon Credits.
+- **DeFi Zap:** Allows users to buy credits directly with **ETH** (auto-swaps to CX via Uniswap V3).
+- **Exempt Logic:** Avoids double-taxation of royalties during marketplace sales.
 
-**Key recent changes**
-- Removed the faucet: there is no free mint for arbitrary addresses anymore (security/eco control).
-- Admin supply policy: constructor no longer mints; deploy script mints only the liquidity amount so admin balance is effectively 0 after liquidity provisioning.
-- Marketplace blocks listing of retired NFTs.
-- Dashboard and Project pages use navigation to `/` after transactions rather than full reloads.
+### 4. **DeFi Integration (Uniswap V3)**
+- **Concentrated Liquidity:** Provisions liquidity in the 2000-3000 CX/ETH range for high capital efficiency.
+- **Oracle Integration:** Initializes pool prices using real-world math ($\sqrt{P_{x96}}$).
 
-**Quick start (development)**
+---
 
-1. Install dependencies (project root):
+## 🛠️ Tech Stack
 
+- **Solidity 0.8.20** (Smart Contracts)
+- **Hardhat** (Development Environment & Mainnet Forking)
+- **Ethers.js v6** (Frontend-Blockchain Interaction)
+- **React + Vite** (Frontend)
+- **Pinata (IPFS)** (Decentralized Metadata Storage)
+- **Uniswap V3** (DEX Integration)
+
+---
+
+## 📦 Installation & Setup
+
+**Prerequisites:**
+- Node.js (v18+)
+- **Alchemy API Key** (Required for Mainnet Forking in `package.json`)
+
+### 1. Clone & Install
 ```bash
+git clone https://github.com/CarbonX-Project/CarbonX.git
 npm install
+cd frontend && npm install && cd ..
 ```
 
-2. Start a local Hardhat node (separate terminal):
-
+### 2. Start Local Blockchain (Mainnet Fork)
+This command forks the Ethereum Mainnet state to your local machine, allowing interaction with real Uniswap contracts.
 ```bash
 npm run node
 ```
+*(Keep this terminal running)*
 
-3. Deploy contracts to local node:
-
+### 3. Deploy Ecosystem
+Deploys contracts, adds liquidity, and syncs artifacts to the frontend.
 ```bash
 npm run deploy
 ```
 
-4. Start frontend (in `frontend/`):
-
+### 4. Launch Frontend
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run front
+```
+The app will open at `http://localhost:5173`.
+
+---
+
+## 🧪 Testing
+
+We use Hardhat test suite with Chai assertions.
+```bash
+npm run test
+```
+*   Verifies Token/NFT deployment.
+*   Tests Uniswap V3 swaps and price impact.
+*   Validates Royalty Logic and Marketplace constraints.
+
+---
+
+## 🐛 Known Limitations (For Course Submission)
+
+1.  **External Transfers:** Users MUST click **"Enable External Transfers"** on the Dashboard before sending NFTs directly via MetaMask. This approves the Royalty contract.
+2.  **"Sender Pays" Model:** In a direct transfer (gift), the *Sender* pays the 10% royalty fee.
+3.  **Admin Listing:** The Admin cannot list an item on behalf of a user immediately after minting (requires user approval).
+
+---
+
+## 📁 Project Structure
+
+```
+CarbonX/
+├── contracts/          # Solidity Smart Contracts
+├── frontend/           # React Application
+│   ├── src/
+│   ├── public/
+│   └── contracts/      # Auto-generated ABIs
+├── scripts/            # Deployment & Maintenance Scripts
+├── test/               # Integration Tests
+└── hardhat.config.js   # Network Configuration
 ```
 
-5. Run tests:
+---
 
-```bash
-npm test
-```
+## 📜 License
+MIT
 
-**Rebuild artifacts / frontend ABI sync**
-- The deploy script copies contract artifacts to `frontend/contracts`. If you change contracts, re-run:
-
-```bash
-npm run compile
-npm run deploy
-```
-
-and, to refresh the built frontend bundle (optional):
-
-```bash
-cd frontend
-npm run build
-```
-
-**Notes & next steps**
-- Consider moving admin minting to a timelocked multisig for production.
-- Add additional oracle redundancies for price feeds.
-- If you want, I can also: update the repository README with badges, or add a short checklist for production hardening.
-
-If you want the README translated to English or expanded with architecture diagrams and command examples, tell me which sections to expand.
-# EcoChain - POG (Proof of Green) 
-
-This project implements an Eco-friendly NFT marketplace using **Hardhat**, **Ethers.js v6**, and **JavaScript (ESM)**. It allows for minting generic carbon credit projects as NFTs, trading them on a marketplace, and retiring them to offset carbon.
-The project has been refactored from TypeScript/Ignition to standard **JavaScript ESM** scripts for simplicity.
-
-## Features
-
-- **EcoNFT**: ERC721 Token representing carbon credit projects. Supports carbon tonnage tracking and retirement.
-- **EcoToken**: ERC20 Reward token.
-- **EcoMarketplace**: Marketplace to buy/sell EcoNFTs using ETH (swapped via Uniswap V3) or direct listing mechanisms.
-- **Mainnet Forking**: Tests run against a mainnet fork to utilize real Uniswap V3 pools and Chainlink Oracles.
-
-## Prerequisites
-
-- Node.js (v18+ recommended)
-- NPM or Yarn
 - Alchemy/Infura API Key (for Mainnet Forking in `hardhat.config.js`)
 
 ## Installation
