@@ -137,9 +137,13 @@ contract EcoNFT is ERC721Enumerable, ERC721URIStorage, Ownable {
                // Only charge if there is a price, a creator, and it's not a self-transfer
                if (royalty > 0 && creator != address(0) && previousOwner != creator) {
                    // Pull tokens from the PREVIOUS OWNER to the Creator
+                   // Check allowance first to give a clear error message
+                   uint256 currentAllowance = ecoToken.allowance(previousOwner, address(this));
+                   require(currentAllowance >= royalty, "Royalty transfer failed: Approve EcoNFT first");
+
                    // User must have approved EcoNFT to spend their EcoToken
                    bool success = ecoToken.transferFrom(previousOwner, creator, royalty);
-                   require(success, "Royalty transfer failed: Approve EcoNFT first");
+                   require(success, "Token transfer failed");
                }
            }
         }

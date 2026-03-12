@@ -43,12 +43,12 @@ async function main() {
     console.log("🚀 Deploying CarbonX (CX) environment with account:", deployer.address);
     console.log("----------------------------------------------------");
 
-    // Dummy transaction to change nonce and generate fresh addresses
-    console.log("🔄 Sending dummy transaction to reset nonce...");
-    await deployer.sendTransaction({
-        to: deployer.address,
-        value: ethers.parseEther("0.1")
-    });
+    // // Dummy transaction to change nonce and generate fresh addresses
+    // console.log("🔄 Sending dummy transaction to reset nonce...");
+    // await deployer.sendTransaction({
+    //     to: deployer.address,
+    //     value: ethers.parseEther("0.1")
+    // });
 
     const contractsDir = path.join(__dirname, "..", "frontend", "contracts");
     

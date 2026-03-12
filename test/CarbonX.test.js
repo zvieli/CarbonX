@@ -572,4 +572,75 @@ describe("🌿 CarbonX Protocol Verification (Mainnet Fork)", function () {
             console.log("    📜 History Verified: Mint -> Transfer");
         });
     });
+
+    // --------------------------------------------------------------------------------
+    // TEST 7: External Transfers & Royalties (OTC)
+    // --------------------------------------------------------------------------------
+    describe("7. External Transfers & Royalties (OTC)", function () {
+        const SUGGESTED_PRICE = ethers.parseEther("1000"); // 1000 CX
+
+        it("Should enforce royalties on OTC transfers (User -> User)", async function () {
+            // Setup Roles: Use addresses not involved heavily above.
+            const [ owner, , , , , cryptoWhale, otcRecipient ] = await ethers.getSigners();
+            
+            // 1. Mint with Suggested Price
+            // Minting to Owner as Creator
+            const tons = 50n;
+            const expiry = 365n;
+            const uri = "ipfs://otc";
+            
+            await ecoNFT.connect(owner).mintProject(owner.address, tons, expiry, uri, SUGGESTED_PRICE);
+            
+            // Get ID (Last one)
+            const totalSupply = await ecoNFT.totalSupply();
+            const id = await ecoNFT.tokenByIndex(totalSupply - 1n);
+
+            // 2. Owner (Creator) transfers to CryptoWhale (First Sale)
+            // Logic: previousOwner == creator -> Royalty check skipped.
+            await ecoNFT.connect(owner).safeTransferFrom(owner.address, cryptoWhale.address, id);
+            expect(await ecoNFT.ownerOf(id)).to.equal(cryptoWhale.address);
+
+            // 3. Setup CryptoWhale (The Seller in OTC)
+            // Needs EcoToken to pay royalty later.
+            const royaltyAmount = (SUGGESTED_PRICE * 10n) / 100n; // 100 CX
+            await ecoToken.connect(owner).mint(cryptoWhale.address, royaltyAmount * 2n);
+            
+            // 4. Case A: Transfer WITHOUT Approval -> Should Fail
+            // CryptoWhale (Seller) tries to send to Recipient directly.
+            // EcoNFT requires `ecoToken.transferFrom(cryptoWhale, Creator, royalty)`.
+            // CryptoWhale hasn't approved EcoNFT to spend their tokens yet.
+            
+            console.log("    🚫 Attempting transfer without approval (Expect Revert)...");
+            await expect(
+                ecoNFT.connect(cryptoWhale).safeTransferFrom(cryptoWhale.address, otcRecipient.address, id)
+            ).to.be.revertedWith("Royalty transfer failed: Approve EcoNFT first");
+
+            // 5. Case B: Approve -> Transfer -> Success
+            console.log("    ✅ Approving and Transferring...");
+            // Approve EcoNFT to spend EcoToken
+            await ecoToken.connect(cryptoWhale).approve(await ecoNFT.getAddress(), ethers.MaxUint256);
+            
+            // Check Balances Before
+            const whaleBalanceBefore = await ecoToken.balanceOf(cryptoWhale.address);
+            const creatorBalanceBefore = await ecoToken.balanceOf(owner.address); // owner is creator
+
+            // Transfer
+            await ecoNFT.connect(cryptoWhale).safeTransferFrom(cryptoWhale.address, otcRecipient.address, id);
+
+            // Check Balances After
+            const whaleBalanceAfter = await ecoToken.balanceOf(cryptoWhale.address);
+            const creatorBalanceAfter = await ecoToken.balanceOf(owner.address);
+
+            // Verify Ownership
+            expect(await ecoNFT.ownerOf(id)).to.equal(otcRecipient.address);
+
+            // Verify Royalty Payment
+            // Whale pays royalty
+            expect(whaleBalanceBefore - whaleBalanceAfter).to.equal(royaltyAmount);
+            // Creator receives royalty
+            expect(creatorBalanceAfter - creatorBalanceBefore).to.equal(royaltyAmount);
+
+            console.log(`    💸 Royalty Paid: ${ethers.formatEther(royaltyAmount)} CX moved from Sender to Creator`);
+        });
+    });
 });
